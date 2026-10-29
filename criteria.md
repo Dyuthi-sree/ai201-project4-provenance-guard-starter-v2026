@@ -42,63 +42,43 @@ Two things worth knowing before you pick numbers:
   a **miss**.
 
 ---
-## 1.
+## 1. Human writing avoids high-confidence AI labels
 
-<!-- Your criterion. It must name a number. -->
+Of 10 pieces of known human-written text, no more than 1 is labelled `high-confidence AI` in each of three trials.
 
-
-
-**Why this target:**
-
-
+**Why this target:** A false accusation can harm a real writer more than missing one AI-written submission harms the site. I allow one error because the model and style signals are imperfect, but more than one false positive out of ten would make the service unsafe for writers.
 
 ---
 
-## 2.
+## 2. Clearly AI and clearly human writing have separated scores
 
-<!-- Your criterion. -->
+Across at least 5 clearly AI-written samples and 5 clearly human-written samples, the average combined score for the AI samples is at least 0.20 higher than the average score for the human samples in each of three trials.
 
-
-
-**Why this target:**
-
-
+**Why this target:** The detector and style signal should create a meaningful difference between clearly different inputs. A gap smaller than 0.20 could be caused by ordinary score variation and would make the label thresholds unreliable.
 
 ---
 
-## 3.
+## 3. All three labels are reachable
 
-<!-- Your criterion. -->
+A test set containing clearly human, borderline, and clearly AI-written text produces at least one `high-confidence human`, one `unsure`, and one `high-confidence AI` label in each of three trials.
 
-
-
-**Why this target:**
-
-
+**Why this target:** If one label never appears, the combining weights or thresholds may make that label impossible to reach. The `unsure` label is especially important because the service should acknowledge uncertainty instead of forcing every submission into a human-or-AI judgment.
 
 ---
 
-## 4.
+## 4. Every valid appeal changes status and is logged
 
-<!-- Your criterion. -->
+For 5 of 5 valid appeals using an existing `content_id`, the service returns a successful response, changes the item’s status to `under_review`, and adds an appeal entry to the audit log.
 
-
-
-**Why this target:**
-
-
+**Why this target:** An appeal is the writer’s safeguard after receiving a potentially harmful label. This path uses deterministic service logic rather than model judgment, so it should work and be recorded every time.
 
 ---
 
-## 5.
+## 5. Invalid submissions are rejected safely
 
-<!-- Your criterion. -->
+For 5 of 5 invalid submissions—including missing text, empty text, whitespace-only text, missing `creator_id`, and text longer than 5,000 characters—the service returns HTTP 400 without calling the detector or crashing.
 
-
-
-**Why this target:**
-
-
+**Why this target:** Invalid or excessive input should be stopped before the expensive detector model runs. A 5,000-character limit allows normal submissions while reducing accidental overload and attempts to abuse the service.
 
 ---
 
