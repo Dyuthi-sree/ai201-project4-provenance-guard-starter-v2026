@@ -33,13 +33,70 @@
      ───────────────────────────────────────────────────────────────────────── -->
 
 <!-- ═══════════════════════ UNIT 7 — THE BUILD ═══════════════════════ -->
+## Stretch Features Declared Before Building
 
+Before implementing the service, I decided to attempt all three stretch features:
+
+1. **Third signal:** I will add a third signal that measures source-attribution cues such as citations, quotations, URLs, and named references. It will be weighted separately from the semantic model and stylometry signals.
+
+2. **Content lookup:** I will add `GET /content/<id>` so a caller can retrieve one item’s current decision and status.
+
+3. **Verified-human path:** I will add a separate verification step through which a creator earns a human-verification credential. That credential will appear on the creator’s later submission responses.
 ## What This Does
 
 <!-- The path a submission takes, from arriving to the label a reader sees.
      Six or seven steps — this is the trace you wrote in Milestone 1. -->
 
+Provenance Guard is a backend service that gives a writing platform a cautious estimate of whether submitted text resembles AI-generated or human writing. It does not claim to prove authorship, and it provides an appeal path because falsely accusing a human writer is the most costly error in this system.
 
+### Submission path
+
+1. A caller sends `text` and `creator_id` as JSON to `POST /submit`.
+2. The route validates that both required fields are present and that the text is usable.
+3. `detector.py` reads the meaning and language patterns of the submitted text and returns a model score.
+4. `stylometry.py` measures surface-writing features such as sentence-length variation, vocabulary variety, and punctuation density and returns a style score.
+5. `scoring.py::combine_signals` combines the signal scores into one confidence score between 0 and 1.
+6. `scoring.py::score_to_label` maps that score to one of three reader-facing labels: high-confidence human, unsure, or high-confidence AI.
+7. The service creates a `content_id`, records the decision and signal scores in `logs/audit.jsonl`, and returns structured JSON to the caller.
+8. If the writer disagrees, they can send the `content_id` and their reasoning to `POST /appeal`. The item is moved to `under_review`, and the appeal is recorded in the audit log.
+
+### False-positive path
+
+A false positive occurs when a real writer’s work receives a high-confidence AI label. The response shows the writer the combined confidence and label rather than presenting the decision as proof. The writer can submit the returned `content_id` and an explanation to `POST /appeal`. The service then records the appeal and changes the item’s status to `under_review` instead of automatically judging the writer again.
+
+### Endpoint contracts
+
+#### `POST /submit`
+
+Input:
+
+- `text` — the writing to examine, as a string.
+- `creator_id` — the site’s identifier for the writer, as a string.
+
+Output:
+
+- `content_id` — a unique identifier for this submission.
+- `guess` — the system’s current human-or-AI estimate.
+- `confidence` — the combined score from 0 to 1.
+- `label` — the complete reader-facing explanation.
+- `model_score` — the semantic detector result.
+- `style_score` — the stylometry result.
+- `status` — initially `evaluated`.
+- Stretch fields will include the third signal and verified-human credential if completed.
+
+#### `POST /appeal`
+
+Input:
+
+- `content_id` — the identifier returned by `/submit`.
+- `reasoning` — the writer’s explanation of why the decision should be reviewed.
+
+Output:
+
+- `content_id` — the appealed item.
+- `status` — `under_review`.
+- `appeal_recorded` — confirmation that the reasoning was stored.
+- `message` — a plain-language confirmation for the writer.
 
 ---
 
