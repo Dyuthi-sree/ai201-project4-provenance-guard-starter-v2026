@@ -202,14 +202,67 @@ def submit():
     payload = request.get_json(silent=True) or {}
 
     # TODO: delete this and build the route.
+    payload = request.get_json(silent=True)
+
+    if not isinstance(payload, dict):
+        return jsonify({
+            "error": "invalid_json",
+            "message": "Send a JSON object containing a text field.",
+        }), 400
+
+    text = payload.get("text")
+    creator_id = payload.get("creator_id", "anonymous")
+
+    if not isinstance(text, str):
+        return jsonify({
+            "error": "invalid_text",
+            "message": "The text field must be a string.",
+        }), 400
+
+    if not text.strip():
+        return jsonify({
+            "error": "invalid_text",
+            "message": "The text field cannot be empty.",
+        }), 400
+
+    if len(text) > 5000:
+        return jsonify({
+            "error": "text_too_long",
+            "message": "The text field cannot exceed 5,000 characters.",
+        }), 400
+
+    if not isinstance(creator_id, str) or not creator_id.strip():
+        creator_id = "anonymous"
+
+    import detector
+
+    content_id = str(uuid.uuid4())
+    model_score = detector.model_signal(text)
+
+    # These remain placeholders until the second signal is built.
+    style_score = 0.50
+    combined_score = model_score
+    guess = "unsure"
+    label = "Authorship uncertain — review recommended."
+
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess=guess,
+        model_score=model_score,
+        style_score=style_score,
+        combined_score=combined_score,
+        label=label,
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "guess": guess,
+        "confidence": combined_score,
+        "label": label,
+        "model_score": model_score,
+        "style_score": style_score,
+    }), 200
 
 
 @app.post("/appeal")
