@@ -237,21 +237,28 @@ def submit():
         creator_id = "anonymous"
 
     import detector
+    import provenance
     import scoring
     import stylometry
 
     content_id = str(uuid.uuid4())
     model_score = detector.model_signal(text)
     style_score = stylometry.style_signal(text)
-    combined_score = scoring.combine_signals(model_score, style_score)
+    source_score = provenance.source_signal(text)
+    combined_score = scoring.combine_signals(
+        model_score,
+        style_score,
+        source_score,
+    )
     guess, label = scoring.score_to_label(combined_score)
-    
+
     audit.log_decision(
         content_id=content_id,
         creator_id=creator_id,
         guess=guess,
         model_score=model_score,
         style_score=style_score,
+        source_score=source_score,
         combined_score=combined_score,
         label=label,
     )
@@ -263,7 +270,9 @@ def submit():
         "label": label,
         "model_score": model_score,
         "style_score": style_score,
+        "source_score": source_score,
     }), 200
+    
 
 
 @app.post("/appeal")
@@ -361,6 +370,7 @@ def get_content(content_id):
         "label": decision.get("label"),
         "model_score": decision.get("model_score"),
         "style_score": decision.get("style_score"),
+        "source_score": decision.get("source_score"),
         "combined_score": decision.get("combined_score"),
         "status": current_status,
         "appeal_count": appeal_count,
