@@ -44,25 +44,23 @@ Before implementing the service, I decided to attempt all three stretch features
 3. **Verified-human path:** I will add a separate verification step through which a creator earns a human-verification credential. That credential will appear on the creator’s later submission responses.
 ## What This Does
 
-<!-- The path a submission takes, from arriving to the label a reader sees.
-     Six or seven steps — this is the trace you wrote in Milestone 1. -->
-
-Provenance Guard is a backend service that gives a writing platform a cautious estimate of whether submitted text resembles AI-generated or human writing. It does not claim to prove authorship, and it provides an appeal path because falsely accusing a human writer is the most costly error in this system.
+Provenance Guard is a Flask backend service that gives a writing platform a cautious estimate of whether submitted text resembles AI-generated or human writing. It does not prove authorship. Because falsely accusing a real writer is more harmful than missing some AI-written text, uncertain results receive a neutral label and writers can appeal.
 
 ### Submission path
 
-1. A caller sends `text` and `creator_id` as JSON to `POST /submit`.
-2. The route validates that both required fields are present and that the text is usable.
-3. `detector.py` reads the meaning and language patterns of the submitted text and returns a model score.
-4. `stylometry.py` measures surface-writing features such as sentence-length variation, vocabulary variety, and punctuation density and returns a style score.
-5. `scoring.py::combine_signals` combines the signal scores into one confidence score between 0 and 1.
-6. `scoring.py::score_to_label` maps that score to one of three reader-facing labels: high-confidence human, unsure, or high-confidence AI.
-7. The service creates a `content_id`, records the decision and signal scores in `logs/audit.jsonl`, and returns structured JSON to the caller.
-8. If the writer disagrees, they can send the `content_id` and their reasoning to `POST /appeal`. The item is moved to `under_review`, and the appeal is recorded in the audit log.
+1. A caller sends `text` and an optional `creator_id` to `POST /submit`.
+2. The route rejects missing, non-string, empty, whitespace-only, or over-5,000-character text before loading the detector.
+3. `detector.py::model_signal` measures how predictable the writing is to GPT-2. Lower perplexity produces a higher AI-likelihood score.
+4. `stylometry.py::style_signal` measures sentence-length variation, vocabulary variety, and punctuation density.
+5. `provenance.py::source_signal` checks for visible source-attribution cues such as URLs, quotations, and attribution phrases.
+6. `scoring.py::combine_signals` combines the three scores into one number from `0.0` (more human-like) to `1.0` (more AI-like).
+7. `scoring.py::score_to_label` maps the combined score to high-confidence human, unsure, or high-confidence AI.
+8. The service creates a `content_id`, records the decision and individual signal scores in `logs/audit.jsonl`, and returns the result.
+9. A writer can appeal through `POST /appeal`. The service preserves the original decision, adds an appeal event, and changes the current status to `under_review`.
 
 ### False-positive path
 
-A false positive occurs when a real writer’s work receives a high-confidence AI label. The response shows the writer the combined confidence and label rather than presenting the decision as proof. The writer can submit the returned `content_id` and an explanation to `POST /appeal`. The service then records the appeal and changes the item’s status to `under_review` instead of automatically judging the writer again.
+If human writing receives an AI label, the response presents it as an automated estimate rather than proof. The writer can submit the returned `content_id` and an explanation to `/appeal`. The service records both events instead of overwriting the original decision, allowing a reviewer to see what happened and in what order.
 
 ### Endpoint contracts
 
@@ -70,162 +68,244 @@ A false positive occurs when a real writer’s work receives a high-confidence A
 
 Input:
 
-- `text` — the writing to examine, as a string.
-- `creator_id` — the site’s identifier for the writer, as a string.
+- `text` — required string containing the writing to examine.
+- `creator_id` — optional writer identifier; invalid or missing values become `anonymous`.
 
 Output:
 
-- `content_id` — a unique identifier for this submission.
-- `guess` — the system’s current human-or-AI estimate.
-- `confidence` — the combined score from 0 to 1.
-- `label` — the complete reader-facing explanation.
-- `model_score` — the semantic detector result.
-- `style_score` — the stylometry result.
-- `status` — initially `evaluated`.
-- Stretch fields will include the third signal and verified-human credential if completed.
+- `content_id`
+- `guess`
+- `confidence` — the combined AI-likelihood score
+- `label`
+- `model_score`
+- `style_score`
+- `source_score`
+- `creator_credential`
 
 #### `POST /appeal`
 
 Input:
 
-- `content_id` — the identifier returned by `/submit`.
-- `reasoning` — the writer’s explanation of why the decision should be reviewed.
+- `content_id`
+- `reasoning`
 
 Output:
 
-- `content_id` — the appealed item.
-- `status` — `under_review`.
-- `appeal_recorded` — confirmation that the reasoning was stored.
-- `message` — a plain-language confirmation for the writer.
+- `content_id`
+- `status`
+- a plain-language confirmation message
 
 ---
 
 ## Signals and Scoring
 
-<!-- For each signal: what property it measures, why that might differ between
-     human and AI writing, and WHAT IT CAN'T SEE.
-
-     The blind spot is not optional. If you can't name it you don't understand
-     the signal yet — and unit 8's attack set is built out of blind spots. -->
-
 ### Signal one — the model signal
 
-**What it measures:**
+**What it measures:** `detector.py::model_signal` measures the text’s perplexity under GPT-2. Text that GPT-2 finds easier to predict receives a higher AI-likelihood score.
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** Generated prose often follows statistically common and predictable word sequences. Human writing can contain more personal, irregular, or surprising choices.
 
-**What it can't see:**
+**What it can't see:** Predictability is not proof of authorship. Formal, plain, second-language, or highly edited human writing can be predictable, while AI writing containing unusual wording can appear less predictable.
 
 ### Signal two — the style signal
 
-**What it measures:**
+**What it measures:** `stylometry.py::style_signal` combines normalized sentence-length spread, type-token ratio, and punctuation density. Low structural variation produces a higher AI-likelihood score.
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** Generated prose often uses evenly sized sentences and repeated, conventional structures. Human writing may be more uneven, mixing fragments, questions, long explanations, and different punctuation.
 
-**What it can't see:**
+**What it can't see:** This signal cannot understand meaning or authorship. A person who writes in a simple, consistent style may score as AI-like, while adding punctuation, sentence breaks, quotations, or typos can make AI-generated text appear more human-like.
+
+### Signal three — source attribution
+
+**What it measures:** `provenance.py::source_signal` looks for visible URLs, quotations, and phrases such as “according to” or “data from.” No visible source evidence receives a neutral score of `0.50`; source cues can lower the score toward `0.00`.
+
+**Why it might differ:** Traceable sources give readers something outside the prose that they can inspect, so this signal can reduce suspicion when visible provenance is present.
+
+**What it can't see:** It cannot verify that a citation is genuine, that a quotation is accurate, or that the source supports the claim. AI-generated text can fabricate citations, so this signal receives the smallest weight.
 
 ### The combining rule
 
-<!-- Write the rule in words, then give the numbers. What happens when the two
-     signals disagree? -->
-
-**The rule:**
+**The rule:** All three signals point in the same direction: higher means more AI-like. The model and style signals receive equal primary weight. Source attribution receives a smaller weight because it is useful supporting evidence but can be fabricated. When the primary signals disagree, their average generally moves the result toward `unsure`, which reduces false accusations.
 
 **The numbers:**
 
+```text
+combined score =
+    (0.40 × model score)
+  + (0.40 × style score)
+  + (0.20 × source score)
+```
+
 **Where it lives:** `scoring.py::combine_signals`
 
-<!-- ⚠️ The grader checks your code against that line. If your rule lives
-     somewhere else, say where. -->
-
-**A case where my two signals split, and what my rule does with it:**
-
-
+**A case where my signals split, and what my rule does with it:** The repetitive test text produced a model score of `0.3373` but a style score of `0.6071`. The model signal leaned human while the style signal leaned AI. With a neutral source score of `0.50`, the weighted combination is approximately `0.4778`, placing the text in the `unsure` band instead of making a strong accusation.
 
 ---
 
 ## Label Variants
 
-<!-- The exact text of all three labels, as a reader would see them, and the
-     score range each covers.
-
-     Write them for someone who has never heard the word "threshold". -->
-
 | Label | Score range | The exact text a reader sees |
-|---|---|---|
-| high-confidence human |  |  |
-| unsure |  |  |
-| high-confidence AI |  |  |
+|---|---:|---|
+| high-confidence human | `0.00 ≤ score ≤ 0.35` | `This text shows strong signals of human writing.` |
+| unsure | `0.35 < score < 0.65` | `The authorship of this text is uncertain. Review is recommended.` |
+| high-confidence AI | `0.65 ≤ score ≤ 1.00` | `This text shows strong signals of AI-generated writing. This automated estimate may be appealed.` |
 
-**Why I worded the "unsure" one this way:**
-<!-- It's the hardest of the three. It has to admit uncertainty without
-     sounding like an accusation, because the person reading it may well have
-     written every word themselves. -->
-
-
+**Why I worded the “unsure” one this way:** It clearly states that the system cannot determine authorship and recommends review without implying that the writer did something wrong. This matters because the person receiving the label may have written every word themselves.
 
 ---
 
 ## Sample Run
 
-<!-- One submission and one appeal, pasted as text: the request, the response,
-     and the log entries. -->
-
-**A submission**
-
-<!-- The response needs content_id, guess, confidence, label, AND both
-     signal scores - model_score and style_score. Unit 8's tools read those
-     two off the response, so leaving them out costs you next unit's
-     diagnostics. -->
+### A submission
 
 ```bash
 $ curl -X POST http://127.0.0.1:5000/submit \
   -H "Content-Type: application/json" \
-  -d '{"text": "...", "creator_id": "..."}'
+  -d '{"text":"I drafted this paragraph after reviewing my class notes. Some parts were easy; others took three rewrites before they sounded right.","creator_id":"dyuthi"}'
 ```
 
 ```json
-
+{
+  "confidence": 0.4223,
+  "content_id": "4ee42bde-2df6-4b2d-8793-8dd2972f3995",
+  "creator_credential": "verified-human",
+  "guess": "unsure",
+  "label": "The authorship of this text is uncertain. Review is recommended.",
+  "model_score": 0.3075,
+  "source_score": 0.5,
+  "style_score": 0.4983
+}
 ```
 
-**An appeal**
+### An appeal
 
 ```bash
 $ curl -X POST http://127.0.0.1:5000/appeal \
   -H "Content-Type: application/json" \
-  -d '{"content_id": "...", "reasoning": "..."}'
+  -d '{"content_id":"4ee42bde-2df6-4b2d-8793-8dd2972f3995","reasoning":"I wrote this paragraph myself from my class notes and would like a human review."}'
 ```
 
 ```json
-
+{
+  "content_id": "4ee42bde-2df6-4b2d-8793-8dd2972f3995",
+  "message": "Your appeal was recorded and the submission is under review.",
+  "status": "under_review"
+}
 ```
 
-**What the log shows afterwards**
+### What the log shows afterwards
 
 ```bash
-$ curl "http://127.0.0.1:5000/log?limit=3"
+$ curl "http://127.0.0.1:5000/log?limit=2"
 ```
 
 ```json
-
+{
+  "count": 2,
+  "entries": [
+    {
+      "combined_score": 0.4223,
+      "content_id": "4ee42bde-2df6-4b2d-8793-8dd2972f3995",
+      "creator_credential": "verified-human",
+      "creator_id": "dyuthi",
+      "guess": "unsure",
+      "label": "The authorship of this text is uncertain. Review is recommended.",
+      "model_score": 0.3075,
+      "source_score": 0.5,
+      "status": "decided",
+      "style_score": 0.4983,
+      "timestamp": "2026-10-29T02:07:52+00:00"
+    },
+    {
+      "content_id": "4ee42bde-2df6-4b2d-8793-8dd2972f3995",
+      "creator_id": "dyuthi",
+      "event": "appeal",
+      "reasoning": "I wrote this paragraph myself from my class notes and would like a human review.",
+      "status": "under_review",
+      "timestamp": "2026-10-29T02:10:20+00:00"
+    }
+  ]
+}
 ```
+
+### Stretch feature — third signal
+
+A submission with source-attribution evidence produced:
+
+```json
+{
+  "confidence": 0.3206,
+  "content_id": "afbc4ce6-a0d3-4e3f-9346-ae59513a0c5d",
+  "guess": "human",
+  "label": "This text shows strong signals of human writing.",
+  "model_score": 0.4169,
+  "source_score": 0.0,
+  "style_score": 0.3845
+}
+```
+
+The third signal receives 20% of the combined score. It lowered the score because the text included an attribution phrase and a URL, but it did not replace the model or style signals.
+
+### Stretch feature — `GET /content/<id>`
+
+```bash
+$ curl "http://127.0.0.1:5000/content/4ee42bde-2df6-4b2d-8793-8dd2972f3995"
+```
+
+```json
+{
+  "appeal_count": 1,
+  "combined_score": 0.4223,
+  "content_id": "4ee42bde-2df6-4b2d-8793-8dd2972f3995",
+  "creator_credential": "verified-human",
+  "creator_id": "dyuthi",
+  "guess": "unsure",
+  "label": "The authorship of this text is uncertain. Review is recommended.",
+  "model_score": 0.3075,
+  "source_score": 0.5,
+  "status": "under_review",
+  "style_score": 0.4983,
+  "appeal_count": 1
+}
+```
+
+The complete response also contains the ordered `history` list with the original decision and appeal.
+
+### Stretch feature — verified-human path
+
+```bash
+$ curl -X POST http://127.0.0.1:5000/verify-human \
+  -H "Content-Type: application/json" \
+  -d '{"creator_id":"dyuthi","attestation":"I confirm that I am the human author."}'
+```
+
+```json
+{
+  "creator_id": "dyuthi",
+  "credential": "verified-human",
+  "message": "Verified-human credential awarded.",
+  "verification_method": "authorship-attestation",
+  "verified_at": "2026-10-29T02:06:05+00:00"
+}
+```
+
+The credential is stored for the creator and appears on later submissions as `"creator_credential": "verified-human"`. This is a lightweight authorship attestation, not identity verification, so it does not automatically change the detector score or label.
 
 ---
 
 ## How I Used AI
 
-**Moment 1**
+### Moment 1
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- **What I asked for:** I asked for help checking whether my five proposed acceptance criteria were numerical, reproducible, and connected to the risks of this service.
+- **What came back:** AI identified measurable structures for false positives, score separation, label reachability, appeals, and malformed input.
+- **What I changed:** I selected the targets, kept the higher standard for deterministic appeal and validation behavior, and corrected the bad-input criterion so it did not incorrectly require `creator_id`.
 
-**Moment 2**
+### Moment 2
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
-
+- **What I asked for:** I asked for help debugging the submission route while connecting the model, style, source-attribution, and verified-human features.
+- **What came back:** AI helped identify missing imports, a removed `guess, label` assignment, and an indentation error that left `creator_credential` undefined.
+- **What I changed:** I added the missing imports and assignment, moved the credential lookup outside the conditional block, reran syntax checks, and verified every fix using real `curl` responses and audit-log entries.
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
