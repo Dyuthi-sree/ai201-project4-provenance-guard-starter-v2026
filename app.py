@@ -30,6 +30,7 @@ from flask import Flask, jsonify, request
 
 import audit
 import config
+import verification
 import scoring
     
 app = Flask(__name__)
@@ -151,6 +152,37 @@ def health():
 
 
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
+@app.post("/verify-human")
+def verify_human():
+    """
+    Award a verified-human credential after an authorship attestation.
+    """
+    payload = request.get_json(silent=True)
+
+    if not isinstance(payload, dict):
+        return jsonify({
+            "error": "invalid_json",
+            "message": "Send a JSON object with creator_id and attestation.",
+        }), 400
+
+    creator_id = payload.get("creator_id")
+    attestation = payload.get("attestation")
+
+    try:
+        credential = verification.verify_creator(
+            creator_id,
+            attestation,
+        )
+    except ValueError as exc:
+        return jsonify({
+            "error": "verification_failed",
+            "message": str(exc),
+        }), 400
+
+    return jsonify({
+        "message": "Verified-human credential awarded.",
+        **credential,
+    }), 200
 
 @app.post("/submit")
 # @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
@@ -236,6 +268,9 @@ def submit():
     if not isinstance(creator_id, str) or not creator_id.strip():
         creator_id = "anonymous"
 
+    creator_id = creator_id.strip()
+    creator_credential = verification.credential_for(creator_id)
+
     import detector
     import provenance
     import scoring
@@ -261,6 +296,7 @@ def submit():
         source_score=source_score,
         combined_score=combined_score,
         label=label,
+        creator_credential=creator_credential,
     )
 
     return jsonify({
@@ -271,6 +307,7 @@ def submit():
         "model_score": model_score,
         "style_score": style_score,
         "source_score": source_score,
+        "creator_credential": creator_credential,
     }), 200
     
 
@@ -375,6 +412,7 @@ def get_content(content_id):
         "status": current_status,
         "appeal_count": appeal_count,
         "history": entries,
+        "creator_credential": decision.get("creator_credential"),
     }), 200
 @app.get("/log")
 def get_log():
