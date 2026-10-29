@@ -53,10 +53,11 @@ def combine_signals(model_score: float, style_score: float) -> float:
     write a different rule.
     """
     # TODO: replace this
-    return (
+    combined = (
         config.WEIGHT_MODEL_SIGNAL * model_score
         + config.WEIGHT_STYLE_SIGNAL * style_score
     )
+    return round(min(max(combined, 0.0), 1.0), 4)
 
 
 def score_to_label(score: float) -> tuple[str, str]:
@@ -87,11 +88,22 @@ def score_to_label(score: float) -> tuple[str, str]:
     """
     # TODO: replace this — thresholds are in config.py
     if score >= config.AI_THRESHOLD:
-        return "ai", "PLACEHOLDER — write the high-confidence AI label."
-    if score <= config.HUMAN_THRESHOLD:
-        return "human", "PLACEHOLDER — write the high-confidence human label."
-    return "unsure", "PLACEHOLDER — write the unsure label."
+        return (
+            "ai",
+            "This text shows strong signals of AI-generated writing. "
+            "This automated estimate may be appealed.",
+        )
 
+    if score <= config.HUMAN_THRESHOLD:
+        return (
+            "human",
+            "This text shows strong signals of human writing.",
+        )
+
+    return (
+        "unsure",
+        "The authorship of this text is uncertain. Review is recommended.",
+    )
 
 def label_ranges() -> list[tuple[str, str]]:
     """

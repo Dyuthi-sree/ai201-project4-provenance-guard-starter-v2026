@@ -64,8 +64,23 @@ def sentence_length_spread(text: str) -> float:
     `stdev` raises on fewer than two values. Decide what that should return
     before the attack set decides for you.
     """
-    # TODO: replace this
-    return 0.0
+    # TODO:     
+    sentence_lengths = [
+        len(words(sentence))
+        for sentence in sentences(text)
+        if words(sentence)
+    ]
+
+    if len(sentence_lengths) < 2:
+        return 0.0
+
+    mean_length = statistics.mean(sentence_lengths)
+    if mean_length == 0:
+        return 0.0
+
+    spread = statistics.stdev(sentence_lengths) / mean_length
+    return round(spread, 4)
+
 
 
 def type_token_ratio(text: str) -> float:
@@ -81,7 +96,13 @@ def type_token_ratio(text: str) -> float:
     that alone can look like a signal.
     """
     # TODO: replace this
-    return 0.0
+    tokens = words(text)[:100]
+
+    if not tokens:
+        return 0.0
+
+    ratio = len(set(tokens)) / len(tokens)
+    return round(ratio, 4)
 
 
 def punctuation_density(text: str) -> float:
@@ -95,7 +116,14 @@ def punctuation_density(text: str) -> float:
         writers.
     """
     # TODO: replace this
-    return 0.0
+    characters = [character for character in text if not character.isspace()]
+
+    if not characters:
+        return 0.0
+
+    punctuation = re.findall(r"[.,!?;:—–-]", text)
+    density = len(punctuation) / len(characters)
+    return round(density, 4)
 
 
 # ── Combining them ───────────────────────────────────────────────────────────
@@ -123,7 +151,26 @@ def style_signal(text: str) -> float:
     to signal one, and it is plain writing that gets accused.
     """
     # TODO: replace this
-    return 0.5
+    spread = sentence_length_spread(text)
+    vocabulary = type_token_ratio(text)
+    punctuation = punctuation_density(text)
+
+    # Human writing is treated as more irregular when it has greater sentence
+    # variation, varied vocabulary, and more varied punctuation.
+    spread_human = min(spread / 0.75, 1.0)
+    vocabulary_human = min(max((vocabulary - 0.35) / 0.55, 0.0), 1.0)
+    punctuation_human = min(punctuation / 0.08, 1.0)
+
+    # Sentence variation carries the most weight because it is less dependent
+    # on text length than the other two measures.
+    human_style_score = (
+        0.50 * spread_human
+        + 0.30 * vocabulary_human
+        + 0.20 * punctuation_human
+    )
+
+    ai_style_score = 1.0 - human_style_score
+    return round(min(max(ai_style_score, 0.0), 1.0), 4)
 
 
 if __name__ == "__main__":

@@ -30,7 +30,8 @@ from flask import Flask, jsonify, request
 
 import audit
 import config
-
+import scoring
+    
 app = Flask(__name__)
 
 
@@ -138,6 +139,7 @@ def health():
     """Is the service up, and has the model been downloaded yet?"""
     import detector
 
+
     loaded = detector._model is not None
     return jsonify({
         "ok": True,
@@ -235,16 +237,15 @@ def submit():
         creator_id = "anonymous"
 
     import detector
+    import scoring
+    import stylometry
 
     content_id = str(uuid.uuid4())
     model_score = detector.model_signal(text)
-
-    # These remain placeholders until the second signal is built.
-    style_score = 0.50
-    combined_score = model_score
-    guess = "unsure"
-    label = "Authorship uncertain — review recommended."
-
+    style_score = stylometry.style_signal(text)
+    combined_score = scoring.combine_signals(model_score, style_score)
+    guess, label = scoring.score_to_label(combined_score)
+    
     audit.log_decision(
         content_id=content_id,
         creator_id=creator_id,
