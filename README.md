@@ -118,7 +118,6 @@ Output:
 ### Signal three — source attribution
 
 **What it measures:** `provenance.py::source_signal` looks for visible URLs, quotations, and phrases such as “according to” or “data from.” No visible source evidence receives a neutral score of `0.50`; source cues can lower the score toward `0.00`.
-
 **Why it might differ:** Traceable sources give readers something outside the prose that they can inspect, so this signal can reduce suspicion when visible provenance is present.
 
 **What it can't see:** It cannot verify that a citation is genuine, that a quotation is accurate, or that the source supports the claim. AI-generated text can fabricate citations, so this signal receives the smallest weight.
@@ -309,7 +308,15 @@ The credential is stored for the creator and appears on later submissions as `"c
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
+## Unit 8 Stretch Features Declared Before Testing
 
+Before running the Unit 8 attack set or changing the detector, I decided to attempt these stretch features:
+
+1. **Per-creator limits:** `/submit` requests will be limited using `creator_id` rather than only the network address. This should catch one creator sending many variations even if requests come through different addresses. The tradeoff is that a malicious caller can rotate fake creator IDs, while multiple legitimate users sharing an address will no longer affect one another.
+
+2. **Second measured improvement:** After diagnosing the untouched before-run and measuring one improvement, I will make one additional diagnosis-driven change. I will run the complete attack set and all five criteria again in the same format and report whether it helped and what it cost elsewhere.
+
+3. **Three attacks against another system:** If another team makes its service available, I will write three original attacks, record the system tested, and report the response and outcome of each attack. I will report unsuccessful attacks honestly.
 ## Rate Limiting
 
 **My limits:** ___ per minute, ___ per day
