@@ -249,7 +249,7 @@ def submit():
         }), 400
 
     text = payload.get("text")
-    creator_id = payload.get("creator_id", "anonymous")
+    creator_id = payload.get("creator_id")
 
     if not isinstance(text, str):
         audit.log_rejection(
@@ -282,10 +282,40 @@ def submit():
             "message": "The text field cannot exceed 5,000 characters.",
         }), 400
 
-    if not isinstance(creator_id, str) or not creator_id.strip():
-        creator_id = "anonymous"
+        if not isinstance(creator_id, str) or not creator_id.strip():
+            audit.log_rejection(
+                creator_id="unknown",
+                reason="invalid_creator_id",
+        )
+        return jsonify({
+            "error": "invalid_creator_id",
+            "message": "A non-empty creator_id string is required.",
+        }), 400
 
     creator_id = creator_id.strip()
+
+    # Reject inputs that do not contain enough word-like material for either
+    # authorship signal to produce a meaningful result. str.isalpha() supports
+    # Unicode, so non-Latin prose is not rejected merely for its alphabet.
+    word_like_tokens = [
+        token
+        for token in text.split()
+        if any(character.isalpha() for character in token)
+    ]
+
+    if len(word_like_tokens) < 3:
+        audit.log_rejection(
+            creator_id=creator_id,
+            reason="insufficient_prose",
+            word_count=len(word_like_tokens),
+        )
+        return jsonify({
+            "error": "insufficient_prose",
+            "message": (
+                "The text must contain at least three word-like tokens "
+                "for a meaningful authorship estimate."
+            ),
+        }), 400
     creator_credential = verification.credential_for(creator_id)
 
     import detector
