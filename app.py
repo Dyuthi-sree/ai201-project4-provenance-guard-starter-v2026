@@ -282,10 +282,10 @@ def submit():
             "message": "The text field cannot exceed 5,000 characters.",
         }), 400
 
-        if not isinstance(creator_id, str) or not creator_id.strip():
-            audit.log_rejection(
-                creator_id="unknown",
-                reason="invalid_creator_id",
+    if not isinstance(creator_id, str) or not creator_id.strip():
+        audit.log_rejection(
+            creator_id="unknown",
+            reason="invalid_creator_id",
         )
         return jsonify({
             "error": "invalid_creator_id",
