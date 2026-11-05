@@ -317,170 +317,578 @@ Before running the Unit 8 attack set or changing the detector, I decided to atte
 2. **Second measured improvement:** After diagnosing the untouched before-run and measuring one improvement, I will make one additional diagnosis-driven change. I will run the complete attack set and all five criteria again in the same format and report whether it helped and what it cost elsewhere.
 
 3. **Three attacks against another system:** If another team makes its service available, I will write three original attacks, record the system tested, and report the response and outcome of each attack. I will report unsuccessful attacks honestly.
-## Rate Limiting
+
 
 ## Rate Limiting
 
 **My limits:** 8 submissions per minute and 100 submissions per day.
 
-**Why those numbers and not others:** Eight submissions per minute allows a real writer to revise and resubmit several times without waiting, while stopping a script that rapidly probes the detector with many variations. A limit of 100 per day is well above normal individual use but prevents sustained automated testing of the scoring thresholds.
+**Why those numbers:** Eight submissions per minute permits several genuine revisions while stopping rapid threshold probing. One hundred per day is well above normal individual use but blocks sustained automated testing.
 
-**What a caller counts as:** Requests are primarily keyed by `creator_id`, with the network address used as a fallback when no valid creator ID is supplied. Per-creator limiting catches one account sending rapid requests even if its address changes and avoids penalizing unrelated writers sharing one address. Its limitation is that a malicious caller could rotate fake creator IDs.
+**What counts as one caller:** Requests are keyed primarily by `creator_id`, with the network address as a fallback. This avoids penalizing unrelated writers sharing an address, but a malicious caller could rotate fake creator IDs.
 
-**The run of status codes when I pushed past it:**
+**Flood result produced by `run_attacks.py --flood 15`:**
 
 ```text
-15 submissions as 'flood_tester' against http://127.0.0.1:5000
-
-[ 1/15] 200
-[ 2/15] 200
-[ 3/15] 200
-[ 4/15] 200
-[ 5/15] 200
-[ 6/15] 200
-[ 7/15] 200
-[ 8/15] 200
-[ 9/15] 429
-[10/15] 429
-[11/15] 429
-[12/15] 429
-[13/15] 429
-[14/15] 429
-[15/15] 429
-
 200 200 200 200 200 200 200 200 429 429 429 429 429 429 429
+```
+
+The limiter accepted eight rapid submissions and rejected seven. Rejections were recorded in `logs/audit.jsonl` with `status: "rejected"` and `reason: "rate_limited"`.
 
 ---
 
 ## Attack Run — Before
 
-<!-- Every attack with its outcome and a held-or-broke mark.
-     `run_attacks.py --label before` produces the table. -->
+The untouched service was tested against all 56 staff attacks by `run_attacks.py::main`. Full evidence is in `results/attack_run_2026-11-04_1946_before.md`.
 
+**Summary:** 38 HELD and 18 BROKE.
 
+| ID | Family | HTTP status | Guess | Verdict |
+|---|---|---:|---|---|
+| EV01 | `evasion` | 200 | unsure | **BROKE** |
+| EV02 | `evasion` | 200 | unsure | **BROKE** |
+| EV03 | `evasion` | 200 | unsure | **BROKE** |
+| EV04 | `evasion` | 200 | unsure | **BROKE** |
+| EV05 | `evasion` | 200 | human | **BROKE** |
+| EV06 | `evasion` | 200 | unsure | **BROKE** |
+| EV07 | `evasion` | 200 | unsure | **BROKE** |
+| EV08 | `evasion` | 200 | unsure | **BROKE** |
+| EV09 | `evasion` | 200 | unsure | **BROKE** |
+| EV10 | `evasion` | 200 | ai | **HELD** |
+| FP01 | `false_positive` | 200 | unsure | **HELD** |
+| FP02 | `false_positive` | 200 | unsure | **HELD** |
+| FP03 | `false_positive` | 200 | unsure | **HELD** |
+| FP04 | `false_positive` | 200 | unsure | **HELD** |
+| FP05 | `false_positive` | 200 | ai | **BROKE** |
+| FP06 | `false_positive` | 200 | unsure | **HELD** |
+| FP07 | `false_positive` | 200 | unsure | **HELD** |
+| FP08 | `false_positive` | 200 | human | **HELD** |
+| PI01 | `prompt_injection` | 200 | unsure | **HELD** |
+| PI02 | `prompt_injection` | 200 | human | **HELD** |
+| PI03 | `prompt_injection` | 200 | unsure | **HELD** |
+| PI04 | `prompt_injection` | 200 | unsure | **HELD** |
+| PI05 | `prompt_injection` | 200 | unsure | **HELD** |
+| PI06 | `prompt_injection` | 200 | unsure | **HELD** |
+| MF01 | `malformed` | 400 | — | **HELD** |
+| MF02 | `malformed` | 500 | — | **BROKE** |
+| MF03 | `malformed` | 200 | unsure | **BROKE** |
+| MF04 | `malformed` | 200 | unsure | **BROKE** |
+| MF05 | `malformed` | 200 | ai | **BROKE** |
+| MF06 | `malformed` | 200 | ai | **BROKE** |
+| MF07 | `malformed` | 200 | ai | **BROKE** |
+| MF08 | `malformed` | 400 | — | **HELD** |
+| RQ01 | `malformed_request` | 400 | — | **HELD** |
+| RQ02 | `malformed_request` | 200 | unsure | **BROKE** |
+| RQ03 | `malformed_request` | 400 | — | **HELD** |
+| RQ04 | `malformed_request` | 400 | — | **HELD** |
+| RQ05 | `malformed_request` | 400 | — | **HELD** |
+| RQ06 | `malformed_request` | 200 | human | **BROKE** |
+| RQ07 | `malformed_request` | 400 | — | **HELD** |
+| RQ08 | `malformed_request` | 400 | — | **HELD** |
+| RQ09 | `malformed_request` | 400 | — | **HELD** |
+| RQ10 | `malformed_request` | 400 | — | **HELD** |
+| RQ11 | `malformed_request` | 400 | — | **HELD** |
+| RQ12 | `malformed_request` | 400 | — | **HELD** |
+| FL01_01 | `flood_same_creator` | 200 | unsure | **HELD** |
+| FL01_02 | `flood_same_creator` | 200 | unsure | **HELD** |
+| FL01_03 | `flood_same_creator` | 200 | unsure | **HELD** |
+| FL01_04 | `flood_same_creator` | 200 | unsure | **HELD** |
+| FL01_05 | `flood_same_creator` | 200 | unsure | **HELD** |
+| FL01_06 | `flood_same_creator` | 200 | unsure | **HELD** |
+| FL01_07 | `flood_same_creator` | 200 | unsure | **HELD** |
+| FL01_08 | `flood_same_creator` | 200 | unsure | **HELD** |
+| FL01_09 | `flood_same_creator` | 429 | — | **HELD** |
+| FL01_10 | `flood_same_creator` | 429 | — | **HELD** |
+| FL01_11 | `flood_same_creator` | 429 | — | **HELD** |
+| FL01_12 | `flood_same_creator` | 429 | — | **HELD** |
 
-**Ten audit log entries from the run**
-
-<!-- Choose entries that show the interesting failures, not the ten easiest. -->
+### Ten audit entries
 
 ```json
-
+[
+  {
+    "combined_score": 0.3898,
+    "content_id": "77a70228-eaeb-4548-830e-34fe8a893a05",
+    "creator_credential": null,
+    "creator_id": "attacker_EV01",
+    "guess": "unsure",
+    "label": "The authorship of this text is uncertain. Review is recommended.",
+    "model_score": 0.1635,
+    "source_score": 0.5,
+    "status": "decided",
+    "style_score": 0.5609,
+    "timestamp": "2026-11-05T01:46:24+00:00"
+  },
+  {
+    "combined_score": 0.3203,
+    "content_id": "c0d11e1c-75e8-4d67-a754-01d60e5c7dc5",
+    "creator_credential": null,
+    "creator_id": "attacker_EV05",
+    "guess": "human",
+    "label": "This text shows strong signals of human writing.",
+    "model_score": 0.3212,
+    "source_score": 0.5,
+    "status": "decided",
+    "style_score": 0.2296,
+    "timestamp": "2026-11-05T01:46:24+00:00"
+  },
+  {
+    "combined_score": 0.7801,
+    "content_id": "4aec8b0d-0b60-43de-99c9-d6406472191b",
+    "creator_credential": null,
+    "creator_id": "attacker_EV10",
+    "guess": "ai",
+    "label": "This text shows strong signals of AI-generated writing. This automated estimate may be appealed.",
+    "model_score": 0.9792,
+    "source_score": 0.5,
+    "status": "decided",
+    "style_score": 0.7211,
+    "timestamp": "2026-11-05T01:46:25+00:00"
+  },
+  {
+    "combined_score": 0.6671,
+    "content_id": "d25fb058-54fb-4812-8e86-f2c427bf97fc",
+    "creator_credential": null,
+    "creator_id": "attacker_FP05",
+    "guess": "ai",
+    "label": "This text shows strong signals of AI-generated writing. This automated estimate may be appealed.",
+    "model_score": 0.8005,
+    "source_score": 0.5,
+    "status": "decided",
+    "style_score": 0.6173,
+    "timestamp": "2026-11-05T01:46:25+00:00"
+  },
+  {
+    "combined_score": 0.4605,
+    "content_id": "1476f9e6-2457-4d03-b4d1-6ad0f3dfa536",
+    "creator_credential": null,
+    "creator_id": "attacker_PI04",
+    "guess": "unsure",
+    "label": "The authorship of this text is uncertain. Review is recommended.",
+    "model_score": 0.4998,
+    "source_score": 0.5,
+    "status": "decided",
+    "style_score": 0.4014,
+    "timestamp": "2026-11-05T01:46:25+00:00"
+  },
+  {
+    "combined_score": 0.8514,
+    "content_id": "c0ad4806-3ca0-4f5d-bbf8-f61fed73ca47",
+    "creator_credential": null,
+    "creator_id": "attacker_MF07",
+    "guess": "ai",
+    "label": "This text shows strong signals of AI-generated writing. This automated estimate may be appealed.",
+    "model_score": 0.9064,
+    "source_score": 0.5,
+    "status": "decided",
+    "style_score": 0.972,
+    "timestamp": "2026-11-05T01:46:25+00:00"
+  },
+  {
+    "combined_score": null,
+    "content_id": null,
+    "creator_id": "flood_tester",
+    "event": "rejected",
+    "guess": null,
+    "label": null,
+    "limit": "8 per 1 minute",
+    "model_score": null,
+    "reason": "rate_limited",
+    "status": "rejected",
+    "style_score": null,
+    "timestamp": "2026-11-05T01:36:15+00:00"
+  },
+  {
+    "combined_score": null,
+    "content_id": null,
+    "creator_id": "flood_tester",
+    "event": "rejected",
+    "guess": null,
+    "label": null,
+    "limit": "8 per 1 minute",
+    "model_score": null,
+    "reason": "rate_limited",
+    "status": "rejected",
+    "style_score": null,
+    "timestamp": "2026-11-05T01:36:15+00:00"
+  },
+  {
+    "combined_score": null,
+    "content_id": null,
+    "creator_id": "flood_tester",
+    "event": "rejected",
+    "guess": null,
+    "label": null,
+    "limit": "8 per 1 minute",
+    "model_score": null,
+    "reason": "rate_limited",
+    "status": "rejected",
+    "style_score": null,
+    "timestamp": "2026-11-05T01:36:15+00:00"
+  },
+  {
+    "combined_score": null,
+    "content_id": null,
+    "creator_id": "flood_tester",
+    "event": "rejected",
+    "guess": null,
+    "label": null,
+    "limit": "8 per 1 minute",
+    "model_score": null,
+    "reason": "rate_limited",
+    "status": "rejected",
+    "style_score": null,
+    "timestamp": "2026-11-05T01:36:15+00:00"
+  }
+]
 ```
 
-**The single worst outcome** — the one I'd least want to explain to a writer
-whose work got caught by it:
-
-
+**Worst outcome:** `FP05` was genuine human technical documentation but received a high-confidence AI label at `0.6671`. Both the model score (`0.8005`) and style score (`0.6173`) were high, pushing it above the `0.65` threshold. This is the costliest failure because it directly accuses a real writer.
 
 ---
 
-## Run Log and Verdicts
-
-<!-- Your five criteria across three trials. `run_eval.py --label before`. -->
+## Run Log and Verdicts — Before
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |
+| 1. Human writing avoids high-confidence AI labels | At most 1 of 10 labelled AI in every run | 0/10 — PASS | 0/10 — PASS | 0/10 — PASS | **MET** |
+| 2. Clearly AI and clearly human writing have separated scores | AI average at least 0.20 above human average | +0.0925 — FAIL | +0.0925 — FAIL | +0.0925 — FAIL | **MISSED** |
+| 3. All three labels are reachable | Human, unsure, and AI all appear | 2/3 — FAIL | 2/3 — FAIL | 2/3 — FAIL | **MISSED** |
+| 4. Every valid appeal changes status and is logged | 5 of 5 | 5/5 — PASS | 5/5 — PASS | 5/5 — PASS | **MET** |
+| 5. Invalid submissions are rejected safely | 5 of 5 return 400 without crashing | 5/5 — PASS | 5/5 — PASS | 5/5 — PASS | **MET** |
 
-**Real output from one trial**, pasted as text, naming the file and function
-that produced it:
+### Real output from one trial
+
+Produced by `run_eval.py::main` through `app.py::submit`; the complete run is in `results/run_2026-11-04_2000_before.md`.
 
 ```json
-
+[
+  {
+    "status": 200,
+    "content_id": "fd72a3f5-6d54-46ca-9ff2-9e4f6dd4c2b5",
+    "guess": "unsure",
+    "confidence": 0.5205,
+    "model_score": 0.6988,
+    "style_score": 0.3524,
+    "source_score": 0.5,
+    "label": "The authorship of this text is uncertain. Review is recommended.",
+    "sent": "Obesity, body weight, and physical activity were chosen as the main re"
+  },
+  {
+    "status": 200,
+    "content_id": "b6395a73-b3de-40a3-a875-cff2ec026623",
+    "guess": "unsure",
+    "confidence": 0.542,
+    "model_score": 0.6228,
+    "style_score": 0.4823,
+    "source_score": 0.5,
+    "label": "The authorship of this text is uncertain. Review is recommended.",
+    "sent": "The WCRF/AICR scoring system evaluates how closely a person follows ca"
+  },
+  {
+    "status": 200,
+    "content_id": "b5ce73b3-c349-4e9c-9a48-6a660db513fc",
+    "guess": "unsure",
+    "confidence": 0.4504,
+    "model_score": 0.4502,
+    "style_score": 0.4259,
+    "source_score": 0.5,
+    "label": "The authorship of this text is uncertain. Review is recommended.",
+    "sent": "Current food-tracking technologies may be unable to distinguish foods "
+  },
+  {
+    "status": 200,
+    "content_id": "2470a630-322c-4239-9fc8-706eaf55eeb2",
+    "guess": "unsure",
+    "confidence": 0.5025,
+    "model_score": 0.3641,
+    "style_score": 0.6422,
+    "source_score": 0.5,
+    "label": "The authorship of this text is uncertain. Review is recommended.",
+    "sent": "The device includes a Time of Flight depth sensor and an Inertial Meas"
+  },
+  {
+    "status": 200,
+    "content_id": "481cdf65-627e-4c2d-9401-3edf43ddebaa",
+    "guess": "unsure",
+    "confidence": 0.4437,
+    "model_score": 0.3294,
+    "style_score": 0.5298,
+    "source_score": 0.5,
+    "label": "The authorship of this text is uncertain. Review is recommended.",
+    "sent": "The proposed system estimates energy expenditure using wearable physic"
+  },
+  {
+    "status": 200,
+    "content_id": "09931fdb-b8e6-467e-973e-c5f939c2a845",
+    "guess": "human",
+    "confidence": 0.3162,
+    "model_score": 0.1891,
+    "style_score": 0.3515,
+    "source_score": 0.5,
+    "label": "This text shows strong signals of human writing.",
+    "sent": "The presentation emphasizes the feasibility of privacy-preserving food"
+  },
+  {
+    "status": 200,
+    "content_id": "663dfb7a-40d2-4531-9818-77f9b5ce22ff",
+    "guess": "unsure",
+    "confidence": 0.546,
+    "model_score": 0.5548,
+    "style_score": 0.5603,
+    "source_score": 0.5,
+    "label": "The authorship of this text is uncertain. Review is recommended.",
+    "sent": "The main objective of Aim 1 is to develop and validate the wearable AI"
+  },
+  {
+    "status": 200,
+    "content_id": "74a5865c-dad7-4462-bd38-c7c9bbd811b6",
+    "guess": "unsure",
+    "confidence": 0.4322,
+    "model_score": 0.3443,
+    "style_score": 0.4861,
+    "source_score": 0.5,
+    "label": "The authorship of this text is uncertain. Review is recommended.",
+    "sent": "Aim 2 proposes a twelve-week real-world pilot involving thirty partici"
+  },
+  {
+    "status": 200,
+    "content_id": "f877aaab-9ff5-4931-baa4-57e552575c45",
+    "guess": "unsure",
+    "confidence": 0.4054,
+    "model_score": 0.3968,
+    "style_score": 0.3668,
+    "source_score": 0.5,
+    "label": "The authorship of this text is uncertain. Review is recommended.",
+    "sent": "Our team believes depth sensing is a useful and privacy-preserving app"
+  },
+  {
+    "status": 200,
+    "content_id": "4cc4c204-33a3-402e-9a0a-5d556c3f46a5",
+    "guess": "unsure",
+    "confidence": 0.4702,
+    "model_score": 0.4937,
+    "style_score": 0.4318,
+    "source_score": 0.5,
+    "label": "The authorship of this text is uncertain. Review is recommended.",
+    "sent": "Our team recommends funding the project as a pilot study with some res"
+  }
+]
 ```
 
-**Diagnoses**
+### Diagnoses
 
-<!-- For each miss AND each broken attack: the stage and the mechanism.
+**Criterion 2 — combining rule:** The model signal separated the two groups by `+0.2524`, but the style signal moved in the wrong direction by `−0.0211` and the source signal was neutral. Weights of `0.40/0.40/0.20` diluted the final difference to `+0.0925`, below the `+0.20` target.
 
-     Your service has five stages: the route, signal one, signal two, the
-     combining rule, and the label mapping.
+**Criterion 3 — combining rule and label mapping:** None of the three fixed calibration inputs crossed the `0.65` AI threshold. Neutral source evidence and mixed model/style scores kept them human or unsure. The criterion was therefore missed, even though other attack inputs showed the AI label itself was reachable.
 
-     Not a diagnosis:  "The evasion attacks got through."
-     A diagnosis:      "Four evasion inputs got through. All four had typos
-                        added to AI-generated text. My second signal measures
-                        word variety, and typos raise word variety — so it read
-                        them as more human. My combining rule weights that
-                        signal at 0.6, so it dragged the whole score down."
+**Evasions `EV01–EV09`:** Typos raised vocabulary variety, uneven sentence lengths looked human, quotations and human openings changed style statistics, unusual vocabulary raised perplexity, and short or heavily edited text weakened the model signal. The combined values stayed below the AI threshold. `EV10` held because both signals remained strongly AI-like.
 
-     Look for a pattern. Five failures on one signal is one problem, not five. -->
+**False positive `FP05`:** Predictable formal technical prose produced high model and style scores, so the label mapping accused a genuine writer.
 
+**Malformed `MF02–MF06`:** The route checked type, emptiness, and total length but not whether usable prose existed. A single character reached the model and crashed; control characters, punctuation, a single enormous token, and emoji received unreliable decisions.
 
+**Malformed `MF07`:** Arabic text was treated as AI because the English GPT-2 detector and current stylometry were not calibrated for that language.
+
+**Requests `RQ02` and `RQ06`:** Missing or non-string creator identities were silently replaced with `anonymous` rather than rejected.
+
+**Prompt injection:** All six held because submitted content was handled as data, not executed as instructions.
+
+**Flood:** The first eight requests were accepted and the remaining requests were rejected with `429`.
 
 ---
 
-## The Improvement
+## First Measured Improvement — Signal Reweighting
 
-**What I changed:**
+**What changed:** Model/style/source weights changed from `0.40/0.40/0.20` to `0.85/0.10/0.05`.
 
-**Which diagnosis pointed at it:**
+**Diagnosis behind it:** The model signal already supplied useful `+0.2524` separation, while style moved slightly backward and source attribution was neutral.
 
-### Attack Run — After
+### Criteria Run — After First Improvement
 
-<!-- Same format. `run_attacks.py --label after` -->
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Human writing avoids high-confidence AI labels | At most 1 of 10 labelled AI | 1/10 — PASS | 1/10 — PASS | 1/10 — PASS | **MET** |
+| 2. AI/human score separation | At least +0.20 | +0.2125 — PASS | +0.2125 — PASS | +0.2125 — PASS | **MET** |
+| 3. All labels reachable | 3/3 labels | 1/3 — FAIL | 1/3 — FAIL | 1/3 — FAIL | **MISSED** |
+| 4. Appeal path | 5/5 | 5/5 — PASS | 5/5 — PASS | 5/5 — PASS | **MET** |
+| 5. Invalid input | 5/5 | 5/5 — PASS | 5/5 — PASS | 5/5 — PASS | **MET** |
 
+### Attack Run — After First Improvement
 
+Full evidence is in `results/attack_run_2026-11-04_2005_after_first.md`.
 
-**Did it help, and how do I know:**
+**Summary:** 34 HELD and 22 BROKE.
 
-<!-- Widening the unsure band usually fixes one problem and creates another.
-     Reporting that trade honestly is worth full credit. -->
+| ID | Family | HTTP status | Guess | Verdict |
+|---|---|---:|---|---|
+| EV01 | `evasion` | 200 | human | **BROKE** |
+| EV02 | `evasion` | 200 | unsure | **BROKE** |
+| EV03 | `evasion` | 200 | unsure | **BROKE** |
+| EV04 | `evasion` | 200 | unsure | **BROKE** |
+| EV05 | `evasion` | 200 | human | **BROKE** |
+| EV06 | `evasion` | 200 | unsure | **BROKE** |
+| EV07 | `evasion` | 200 | unsure | **BROKE** |
+| EV08 | `evasion` | 200 | human | **BROKE** |
+| EV09 | `evasion` | 200 | ai | **HELD** |
+| EV10 | `evasion` | 200 | ai | **HELD** |
+| FP01 | `false_positive` | 200 | unsure | **HELD** |
+| FP02 | `false_positive` | 200 | ai | **BROKE** |
+| FP03 | `false_positive` | 200 | ai | **BROKE** |
+| FP04 | `false_positive` | 200 | ai | **BROKE** |
+| FP05 | `false_positive` | 200 | ai | **BROKE** |
+| FP06 | `false_positive` | 200 | ai | **BROKE** |
+| FP07 | `false_positive` | 200 | ai | **BROKE** |
+| FP08 | `false_positive` | 200 | human | **HELD** |
+| PI01 | `prompt_injection` | 200 | unsure | **HELD** |
+| PI02 | `prompt_injection` | 200 | human | **HELD** |
+| PI03 | `prompt_injection` | 200 | unsure | **HELD** |
+| PI04 | `prompt_injection` | 200 | unsure | **HELD** |
+| PI05 | `prompt_injection` | 200 | unsure | **HELD** |
+| PI06 | `prompt_injection` | 200 | unsure | **HELD** |
+| MF01 | `malformed` | 400 | — | **HELD** |
+| MF02 | `malformed` | 500 | — | **BROKE** |
+| MF03 | `malformed` | 200 | human | **BROKE** |
+| MF04 | `malformed` | 200 | human | **BROKE** |
+| MF05 | `malformed` | 200 | ai | **BROKE** |
+| MF06 | `malformed` | 200 | ai | **BROKE** |
+| MF07 | `malformed` | 200 | ai | **BROKE** |
+| MF08 | `malformed` | 400 | — | **HELD** |
+| RQ01 | `malformed_request` | 400 | — | **HELD** |
+| RQ02 | `malformed_request` | 200 | human | **BROKE** |
+| RQ03 | `malformed_request` | 400 | — | **HELD** |
+| RQ04 | `malformed_request` | 400 | — | **HELD** |
+| RQ05 | `malformed_request` | 400 | — | **HELD** |
+| RQ06 | `malformed_request` | 200 | human | **BROKE** |
+| RQ07 | `malformed_request` | 400 | — | **HELD** |
+| RQ08 | `malformed_request` | 400 | — | **HELD** |
+| RQ09 | `malformed_request` | 400 | — | **HELD** |
+| RQ10 | `malformed_request` | 400 | — | **HELD** |
+| RQ11 | `malformed_request` | 400 | — | **HELD** |
+| RQ12 | `malformed_request` | 400 | — | **HELD** |
+| FL01_01 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_02 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_03 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_04 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_05 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_06 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_07 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_08 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_09 | `flood_same_creator` | 429 | — | **HELD** |
+| FL01_10 | `flood_same_creator` | 429 | — | **HELD** |
+| FL01_11 | `flood_same_creator` | 429 | — | **HELD** |
+| FL01_12 | `flood_same_creator` | 429 | — | **HELD** |
 
+**Did it help?** It raised measured separation from `+0.0925` to `+0.2125` and met Criterion 2. However, human false-positive attacks labeled AI rose from one to six, total broken attacks rose from 18 to 22, and the calibration inputs produced only the human label. The intended metric improved, but the safety tradeoff worsened.
 
+---
+
+## Second Measured Improvement — Request Validation
+
+**What changed:** `/submit` now requires a non-empty string `creator_id` and at least three Unicode word-like tokens before either detector runs.
+
+**Diagnosis behind it:** `MF02` crashed on one character; `MF03–MF06` contained no meaningful prose; and `RQ02`/`RQ06` showed that malformed identities were silently accepted.
+
+### Criteria Run — After Second Improvement
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Human writing avoids high-confidence AI labels | At most 1 of 10 labelled AI | 1/10 — PASS | 1/10 — PASS | 1/10 — PASS | **MET** |
+| 2. AI/human score separation | At least +0.20 | +0.2125 — PASS | +0.2125 — PASS | +0.2125 — PASS | **MET** |
+| 3. All labels reachable | 3/3 labels | 1/3 — FAIL | 1/3 — FAIL | 1/3 — FAIL | **MISSED** |
+| 4. Appeal path | 5/5 | 5/5 — PASS | 5/5 — PASS | 5/5 — PASS | **MET** |
+| 5. Invalid input | 5/5 | 5/5 — PASS | 5/5 — PASS | 5/5 — PASS | **MET** |
+
+### Attack Run — After Second Improvement
+
+Full evidence is in `results/attack_run_2026-11-04_2019_after_second_final.md`.
+
+**Summary:** 41 HELD and 15 BROKE.
+
+| ID | Family | HTTP status | Guess | Verdict |
+|---|---|---:|---|---|
+| EV01 | `evasion` | 200 | human | **BROKE** |
+| EV02 | `evasion` | 200 | unsure | **BROKE** |
+| EV03 | `evasion` | 200 | unsure | **BROKE** |
+| EV04 | `evasion` | 200 | unsure | **BROKE** |
+| EV05 | `evasion` | 200 | human | **BROKE** |
+| EV06 | `evasion` | 200 | unsure | **BROKE** |
+| EV07 | `evasion` | 200 | unsure | **BROKE** |
+| EV08 | `evasion` | 200 | human | **BROKE** |
+| EV09 | `evasion` | 200 | ai | **HELD** |
+| EV10 | `evasion` | 200 | ai | **HELD** |
+| FP01 | `false_positive` | 200 | unsure | **HELD** |
+| FP02 | `false_positive` | 200 | ai | **BROKE** |
+| FP03 | `false_positive` | 200 | ai | **BROKE** |
+| FP04 | `false_positive` | 200 | ai | **BROKE** |
+| FP05 | `false_positive` | 200 | ai | **BROKE** |
+| FP06 | `false_positive` | 200 | ai | **BROKE** |
+| FP07 | `false_positive` | 200 | ai | **BROKE** |
+| FP08 | `false_positive` | 200 | human | **HELD** |
+| PI01 | `prompt_injection` | 200 | unsure | **HELD** |
+| PI02 | `prompt_injection` | 200 | human | **HELD** |
+| PI03 | `prompt_injection` | 200 | unsure | **HELD** |
+| PI04 | `prompt_injection` | 200 | unsure | **HELD** |
+| PI05 | `prompt_injection` | 200 | unsure | **HELD** |
+| PI06 | `prompt_injection` | 200 | unsure | **HELD** |
+| MF01 | `malformed` | 400 | — | **HELD** |
+| MF02 | `malformed` | 400 | — | **HELD** |
+| MF03 | `malformed` | 400 | — | **HELD** |
+| MF04 | `malformed` | 400 | — | **HELD** |
+| MF05 | `malformed` | 400 | — | **HELD** |
+| MF06 | `malformed` | 400 | — | **HELD** |
+| MF07 | `malformed` | 200 | ai | **BROKE** |
+| MF08 | `malformed` | 400 | — | **HELD** |
+| RQ01 | `malformed_request` | 400 | — | **HELD** |
+| RQ02 | `malformed_request` | 400 | — | **HELD** |
+| RQ03 | `malformed_request` | 400 | — | **HELD** |
+| RQ04 | `malformed_request` | 400 | — | **HELD** |
+| RQ05 | `malformed_request` | 400 | — | **HELD** |
+| RQ06 | `malformed_request` | 400 | — | **HELD** |
+| RQ07 | `malformed_request` | 400 | — | **HELD** |
+| RQ08 | `malformed_request` | 400 | — | **HELD** |
+| RQ09 | `malformed_request` | 400 | — | **HELD** |
+| RQ10 | `malformed_request` | 400 | — | **HELD** |
+| RQ11 | `malformed_request` | 429 | — | **HELD** |
+| RQ12 | `malformed_request` | 400 | — | **HELD** |
+| FL01_01 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_02 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_03 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_04 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_05 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_06 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_07 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_08 | `flood_same_creator` | 200 | human | **HELD** |
+| FL01_09 | `flood_same_creator` | 429 | — | **HELD** |
+| FL01_10 | `flood_same_creator` | 429 | — | **HELD** |
+| FL01_11 | `flood_same_creator` | 429 | — | **HELD** |
+| FL01_12 | `flood_same_creator` | 429 | — | **HELD** |
+
+**Did it help?** Yes. The final attack run had no `500` responses. `MF02–MF06`, `RQ02`, and `RQ06` became safe `400` responses. Held attacks increased from 34 to 41 and broken attacks fell from 22 to 15. The cost is that legitimate submissions with fewer than three word-like tokens are rejected.
 
 ---
 
 ## What's Still Broken
 
-<!-- For each attack still getting through and each criterion still missed:
-     what you'd do, and why you stopped. -->
+Criterion 3 remains missed because the three fixed calibration inputs produce only the human label after reweighting. With more time, I would build a larger held-out calibration set of verified human, AI-generated, and genuinely uncertain writing, then tune thresholds and weights against that set.
 
+Eight evasions still avoid the AI label by using typos, quotations, uneven sentence structure, unusual vocabulary, short context, or human editing. I would add adversarial calibration examples and length-aware scoring rather than patching individual strings.
 
+Six genuine human false-positive attacks are still labeled AI. The `0.85` model weight improves average separation but harms predictable formal human writing. Before production, I would reduce that weight or raise the AI threshold and measure the effect on a larger human set.
 
-**The trade I'd make if this ran for real:**
+`MF07` remains broken because Arabic is outside the reliable range of the English detector and stylometry. I would detect unsupported languages and return an uncertainty/unsupported-language response instead of an AI accusation.
 
-<!-- Two sentences. Fewer wrong accusations means more AI text getting through.
-     Say which way you'd go and WHO PAYS FOR IT. -->
+**First fix with more time:** Human false positives. A missed AI detection lets generated text through; a false accusation directly harms a writer and forces that person to appeal.
 
+**Production tradeoff:** I would widen the unsure band or reduce the model weight to lower false accusations. More AI text would pass as unsure, but that is safer than making genuine writers bear the cost of an unreliable detector.
 
+### Stretch Feature Outcomes
 
-<!-- ═════════════════════════════════════════════════════════════════════
+**Per-creator limits:** Completed. This catches one creator sending rapid variations and prevents people sharing an address from consuming one another's quota. An attacker can still rotate fake IDs.
 
-     SUBMISSION CHECKLIST — unit 7
+**Second measured improvement:** Completed. Baseline, first-improvement, and second-improvement runs use the full attack set and all five criteria.
 
-       [ ] criteria.md has five numbered criteria, each naming a target
-       [ ] Each has a reason underneath
-       [ ] POST /submit returns content_id, guess, confidence, label,
-           model_score and style_score
-       [ ] Two signals that measure DIFFERENT things, each with a named blind spot
-       [ ] Three label variants, all reachable, written out in full
-       [ ] POST /appeal changes status and writes to the log
-       [ ] Signals and Scoring names scoring.py::combine_signals
-       [ ] Sample Run: a submission AND an appeal, as pasted text
-       [ ] At least four new commits
-       [ ] Repository URL submitted — WRITE IT DOWN
+**Three attacks against another system:** Not completed because another team's reachable service and results were unavailable; this point is not claimed.
 
-     SUBMISSION CHECKLIST — unit 8
-
-       [ ] Rate limiting on /submit, with your numbers justified
-       [ ] The pasted run of status codes showing 429
-       [ ] Audit log with all nine fields, recording rejections too
-       [ ] The attack set run IN FULL, every input with an outcome
-       [ ] Ten audit log entries pasted as text
-       [ ] Five criteria across three trials
-       [ ] A diagnosis for every miss and every broken attack — stage AND mechanism
-       [ ] One improvement, with Attack Run — After
-       [ ] What's Still Broken, including the production trade
-       [ ] At least four new commits
-       [ ] The SAME repository URL as last unit
-
-     Do not delete and recreate this repository.
-     ═════════════════════════════════════════════════════════════════════ -->
-
----
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
