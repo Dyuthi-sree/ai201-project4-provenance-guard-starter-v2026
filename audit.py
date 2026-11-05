@@ -103,13 +103,19 @@ def log_rejection(creator_id: str, reason: str, **extra) -> dict:
     quiet afternoon.
     """
     return _append({
-        "timestamp": _now(),
-        "creator_id": creator_id,
-        "event": "rejected",
-        "status": "rejected",
-        "reason": reason,
-        **extra,
-    })
+    "timestamp": _now(),
+    "content_id": None,
+    "creator_id": creator_id,
+    "guess": None,
+    "model_score": None,
+    "style_score": None,
+    "combined_score": None,
+    "label": None,
+    "status": "rejected",
+    "event": "rejected",
+    "reason": reason,
+    **extra,
+})
 
 
 def _append(entry: dict) -> dict:

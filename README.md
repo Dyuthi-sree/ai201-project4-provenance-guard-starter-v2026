@@ -319,25 +319,36 @@ Before running the Unit 8 attack set or changing the detector, I decided to atte
 3. **Three attacks against another system:** If another team makes its service available, I will write three original attacks, record the system tested, and report the response and outcome of each attack. I will report unsuccessful attacks honestly.
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+## Rate Limiting
 
-**Why those numbers and not others:**
-<!-- Think about two people: a real writer submitting their own work a few
-     times an hour, and a script sending a thousand variations to map your
-     thresholds. Your numbers have to be liveable for the first and hostile to
-     the second. -->
+**My limits:** 8 submissions per minute and 100 submissions per day.
 
-**What a caller counts as:** <!-- per address, or per creator_id? They fail
-differently — one script can look like a thousand callers, and one household
-can look like one. -->
+**Why those numbers and not others:** Eight submissions per minute allows a real writer to revise and resubmit several times without waiting, while stopping a script that rapidly probes the detector with many variations. A limit of 100 per day is well above normal individual use but prevents sustained automated testing of the scoring thresholds.
+
+**What a caller counts as:** Requests are primarily keyed by `creator_id`, with the network address used as a fallback when no valid creator ID is supplied. Per-creator limiting catches one account sending rapid requests even if its address changes and avoids penalizing unrelated writers sharing one address. Its limitation is that a malicious caller could rotate fake creator IDs.
 
 **The run of status codes when I pushed past it:**
 
-<!-- python run_attacks.py --flood 15 -->
+```text
+15 submissions as 'flood_tester' against http://127.0.0.1:5000
 
-```
+[ 1/15] 200
+[ 2/15] 200
+[ 3/15] 200
+[ 4/15] 200
+[ 5/15] 200
+[ 6/15] 200
+[ 7/15] 200
+[ 8/15] 200
+[ 9/15] 429
+[10/15] 429
+[11/15] 429
+[12/15] 429
+[13/15] 429
+[14/15] 429
+[15/15] 429
 
-```
+200 200 200 200 200 200 200 200 429 429 429 429 429 429 429
 
 ---
 

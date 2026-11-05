@@ -185,7 +185,7 @@ def verify_human():
     }), 200
 
 @app.post("/submit")
-# @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
+@limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
 def submit():
     """
     Take a piece of text, decide about it, log the decision, answer.
@@ -239,6 +239,10 @@ def submit():
     payload = request.get_json(silent=True)
 
     if not isinstance(payload, dict):
+        audit.log_rejection(
+            creator_id="unknown",
+            reason="invalid_json",
+        )
         return jsonify({
             "error": "invalid_json",
             "message": "Send a JSON object containing a text field.",
@@ -248,18 +252,31 @@ def submit():
     creator_id = payload.get("creator_id", "anonymous")
 
     if not isinstance(text, str):
+        audit.log_rejection(
+            creator_id=creator_id if isinstance(creator_id, str) else "unknown",
+            reason="invalid_text_type",
+        )
         return jsonify({
             "error": "invalid_text",
             "message": "The text field must be a string.",
         }), 400
 
     if not text.strip():
+        audit.log_rejection(
+            creator_id=creator_id if isinstance(creator_id, str) else "unknown",
+            reason="empty_text",
+        )
         return jsonify({
             "error": "invalid_text",
             "message": "The text field cannot be empty.",
         }), 400
 
     if len(text) > 5000:
+        audit.log_rejection(
+            creator_id=creator_id if isinstance(creator_id, str) else "unknown",
+            reason="text_too_long",
+            text_length=len(text),
+        )
         return jsonify({
             "error": "text_too_long",
             "message": "The text field cannot exceed 5,000 characters.",
