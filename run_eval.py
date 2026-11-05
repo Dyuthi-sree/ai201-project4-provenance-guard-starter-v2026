@@ -115,23 +115,87 @@ def main():
             results = []
             for i, body in enumerate(bodies_for(scenario), 1):
                 preview = describe(body)
+
                 try:
-                    response = requests.post(f"{args.url}/submit", json=body,
-                                             timeout=args.timeout)
+                    response = requests.post(
+                        f"{args.url}/submit",
+                        json=body,
+                        timeout=args.timeout,
+                    )
                     payload = response.json() if response.content else {}
-                    results.append({
+
+                    record = {
                         "status": response.status_code,
+                        "content_id": payload.get("content_id"),
                         "guess": payload.get("guess"),
                         "confidence": payload.get("confidence"),
                         "model_score": payload.get("model_score"),
                         "style_score": payload.get("style_score"),
+                        "source_score": payload.get("source_score"),
                         "label": payload.get("label"),
                         "sent": preview,
-                    })
-                except Exception as exc:  # noqa: BLE001
-                    results.append({"status": None, "error": f"{type(exc).__name__}: {exc}",
-                                    "sent": preview})
+                    }
 
+                    split_after = scenario.get("split_after")
+                    if split_after:
+                        record["expected_source"] = (
+                            "human" if i <= split_after else "ai"
+                        )
+
+                    expected_guesses = scenario.get("expected_guesses", [])
+                    if i <= len(expected_guesses):
+                        record["expected_guess"] = expected_guesses[i - 1]
+
+                    if scenario.get("appeal") and response.status_code == 200:
+                        content_id = payload.get("content_id")
+
+                        appeal_response = requests.post(
+                            f"{args.url}/appeal",
+                            json={
+                                "content_id": content_id,
+                                "reasoning": (
+                                    "I wrote this submission myself and request "
+                                    "a human review of the automated decision."
+                                ),
+                            },
+                            timeout=args.timeout,
+                        )
+                        appeal_payload = (
+                            appeal_response.json()
+                            if appeal_response.content
+                            else {}
+                        )
+
+                        content_response = requests.get(
+                            f"{args.url}/content/{content_id}",
+                            timeout=args.timeout,
+                        )
+                        content_payload = (
+                            content_response.json()
+                            if content_response.content
+                            else {}
+                        )
+
+                        history = content_payload.get("history", [])
+                        record.update({
+                            "appeal_http_status": appeal_response.status_code,
+                            "appeal_status": appeal_payload.get("status"),
+                            "current_status": content_payload.get("status"),
+                            "appeal_logged": any(
+                                entry.get("event") == "appeal"
+                                and entry.get("status") == "under_review"
+                                for entry in history
+                            ),
+                        })
+
+                    results.append(record)
+
+                except Exception as exc:  # noqa: BLE001
+                    results.append({
+                        "status": None,
+                        "error": f"{type(exc).__name__}: {exc}",
+                        "sent": preview,
+                    })
             trials.append(results)
             guesses = [r.get("guess") or "—" for r in results]
             print(f"  trial {trial}: {', '.join(guesses)}")
