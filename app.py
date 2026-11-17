@@ -148,6 +148,12 @@ def health():
         "detector_loaded": loaded,
         "rate_limiting": config.RATE_LIMITING_ENABLED,
         "log_entries": len(audit.read_entries()),
+        "model_score_cache": {
+            "hits": detector.model_signal.cache_info().hits,
+            "misses": detector.model_signal.cache_info().misses,
+            "max_size": detector.model_signal.cache_info().maxsize,
+            "current_size": detector.model_signal.cache_info().currsize,
+            },
     })
 
 

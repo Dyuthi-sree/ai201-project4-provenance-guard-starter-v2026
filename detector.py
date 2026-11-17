@@ -40,7 +40,7 @@ Don't take that on trust — it's a claim you can check. Milestone 4 has you run
 four calibration inputs. Add a plainly-written human paragraph to them and see
 for yourself where it lands.
 """
-
+from functools import lru_cache
 import math
 
 import config
@@ -112,7 +112,7 @@ def perplexity(text: str) -> float:
     # The model's loss here IS mean negative log-likelihood per token.
     return float(math.exp(output.loss.item()))
 
-
+@lru_cache(maxsize=256)
 def model_signal(text: str) -> float:
     """
     The signal, as a 0–1 score. **Higher means more likely AI.**
