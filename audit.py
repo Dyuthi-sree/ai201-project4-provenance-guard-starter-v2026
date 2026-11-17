@@ -117,6 +117,36 @@ def log_rejection(creator_id: str, reason: str, **extra) -> dict:
     **extra,
 })
 
+def log_batch(
+    batch_id: str,
+    input_count: int,
+    success_count: int,
+    error_count: int,
+    output_guesses: list[str],
+    duration_ms: float,
+    average_item_ms: float,
+    status: str,
+    **extra,
+) -> dict:
+    """
+    Record one complete batch request as structured JSON.
+
+    The record contains what came in, what came out, how long processing took,
+    and whether the batch completed, partially completed, or was rejected.
+    """
+    return _append({
+        "timestamp": _now(),
+        "event": "batch_submission",
+        "batch_id": batch_id,
+        "input_count": input_count,
+        "success_count": success_count,
+        "error_count": error_count,
+        "output_guesses": output_guesses,
+        "duration_ms": round(duration_ms, 3),
+        "average_item_ms": round(average_item_ms, 3),
+        "status": status,
+        **extra,
+    })
 
 def _append(entry: dict) -> dict:
     config.LOG_DIR.mkdir(parents=True, exist_ok=True)
