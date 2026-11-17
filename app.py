@@ -24,8 +24,8 @@ Routes:
     GET  /health      is the service up, and is the model loaded
 """
 
+import time
 import uuid
-
 from flask import Flask, jsonify, request
 
 import audit
@@ -357,7 +357,248 @@ def submit():
         "creator_credential": creator_credential,
     }), 200
     
+@app.post("/batch-submit")
+def batch_submit():
+    """Evaluate between one and ten submissions in a single request."""
+    request_started = time.perf_counter()
+    batch_id = str(uuid.uuid4())
 
+    def reject_batch(reason: str, message: str, input_count: int = 0):
+        duration_ms = (time.perf_counter() - request_started) * 1000
+        audit.log_batch(
+            batch_id=batch_id,
+            input_count=input_count,
+            success_count=0,
+            error_count=input_count if input_count else 1,
+            output_guesses=[],
+            duration_ms=duration_ms,
+            average_item_ms=0.0,
+            status="rejected",
+            rejection_reason=reason,
+        )
+        return jsonify({
+            "batch_id": batch_id,
+            "error": reason,
+            "message": message,
+        }), 400
+
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return reject_batch(
+            "invalid_json",
+            "Send a JSON object containing an items list.",
+        )
+
+    items = payload.get("items")
+    if not isinstance(items, list):
+        return reject_batch(
+            "invalid_items_type",
+            "The items field must be a list.",
+        )
+    if not items:
+        return reject_batch(
+            "empty_batch",
+            "The items list must contain at least one submission.",
+        )
+    if len(items) > 10:
+        return reject_batch(
+            "batch_too_large",
+            "A batch cannot contain more than 10 submissions.",
+            input_count=len(items),
+        )
+
+    import detector
+    import provenance
+    import scoring
+    import stylometry
+
+    results = []
+    output_guesses = []
+    success_count = 0
+    error_count = 0
+    stage_totals_ms = {
+        "validation": 0.0,
+        "model": 0.0,
+        "style": 0.0,
+        "source": 0.0,
+        "combining": 0.0,
+    }
+    processing_started = time.perf_counter()
+
+    def item_error(index: int, error: str, message: str):
+        nonlocal error_count
+        error_count += 1
+        results.append({
+            "index": index,
+            "status": "error",
+            "error": error,
+            "message": message,
+        })
+
+    for index, item in enumerate(items):
+        item_started = time.perf_counter()
+        validation_started = time.perf_counter()
+
+        if not isinstance(item, dict):
+            stage_totals_ms["validation"] += (
+                time.perf_counter() - validation_started
+            ) * 1000
+            item_error(index, "invalid_item", "Each item must be a JSON object.")
+            continue
+
+        text = item.get("text")
+        creator_id = item.get("creator_id")
+
+        if not isinstance(text, str):
+            stage_totals_ms["validation"] += (
+                time.perf_counter() - validation_started
+            ) * 1000
+            item_error(index, "invalid_text", "The text field must be a string.")
+            continue
+        if not text.strip():
+            stage_totals_ms["validation"] += (
+                time.perf_counter() - validation_started
+            ) * 1000
+            item_error(index, "empty_text", "The text field cannot be empty.")
+            continue
+        if len(text) > 5000:
+            stage_totals_ms["validation"] += (
+                time.perf_counter() - validation_started
+            ) * 1000
+            item_error(index, "text_too_long", "Text cannot exceed 5,000 characters.")
+            continue
+        if not isinstance(creator_id, str) or not creator_id.strip():
+            stage_totals_ms["validation"] += (
+                time.perf_counter() - validation_started
+            ) * 1000
+            item_error(
+                index,
+                "invalid_creator_id",
+                "A non-empty creator_id string is required.",
+            )
+            continue
+
+        word_like_tokens = [
+            token
+            for token in text.split()
+            if any(character.isalpha() for character in token)
+        ]
+        if len(word_like_tokens) < 3:
+            stage_totals_ms["validation"] += (
+                time.perf_counter() - validation_started
+            ) * 1000
+            item_error(
+                index,
+                "insufficient_prose",
+                "Text must contain at least three word-like tokens.",
+            )
+            continue
+
+        creator_id = creator_id.strip()
+        stage_totals_ms["validation"] += (
+            time.perf_counter() - validation_started
+        ) * 1000
+
+        stage_started = time.perf_counter()
+        model_score = detector.model_signal(text)
+        model_ms = (time.perf_counter() - stage_started) * 1000
+        stage_totals_ms["model"] += model_ms
+
+        stage_started = time.perf_counter()
+        style_score = stylometry.style_signal(text)
+        style_ms = (time.perf_counter() - stage_started) * 1000
+        stage_totals_ms["style"] += style_ms
+
+        stage_started = time.perf_counter()
+        source_score = provenance.source_signal(text)
+        source_ms = (time.perf_counter() - stage_started) * 1000
+        stage_totals_ms["source"] += source_ms
+
+        stage_started = time.perf_counter()
+        combined_score = scoring.combine_signals(
+            model_score,
+            style_score,
+            source_score,
+        )
+        guess, label = scoring.score_to_label(combined_score)
+        combining_ms = (time.perf_counter() - stage_started) * 1000
+        stage_totals_ms["combining"] += combining_ms
+
+        content_id = str(uuid.uuid4())
+        creator_credential = verification.credential_for(creator_id)
+        item_duration_ms = (time.perf_counter() - item_started) * 1000
+
+        audit.log_decision(
+            content_id=content_id,
+            creator_id=creator_id,
+            guess=guess,
+            model_score=model_score,
+            style_score=style_score,
+            source_score=source_score,
+            combined_score=combined_score,
+            label=label,
+            creator_credential=creator_credential,
+            batch_id=batch_id,
+            batch_index=index,
+            item_duration_ms=round(item_duration_ms, 3),
+        )
+
+        success_count += 1
+        output_guesses.append(guess)
+        results.append({
+            "index": index,
+            "status": "success",
+            "content_id": content_id,
+            "creator_id": creator_id,
+            "guess": guess,
+            "confidence": combined_score,
+            "label": label,
+            "model_score": model_score,
+            "style_score": style_score,
+            "source_score": source_score,
+            "creator_credential": creator_credential,
+            "duration_ms": round(item_duration_ms, 3),
+            "stage_duration_ms": {
+                "model": round(model_ms, 3),
+                "style": round(style_ms, 3),
+                "source": round(source_ms, 3),
+                "combining": round(combining_ms, 3),
+            },
+        })
+
+    processing_ms = (time.perf_counter() - processing_started) * 1000
+    total_duration_ms = (time.perf_counter() - request_started) * 1000
+    average_item_ms = processing_ms / len(items)
+    batch_status = "completed" if error_count == 0 else "partial"
+    rounded_stage_totals = {
+        name: round(value, 3)
+        for name, value in stage_totals_ms.items()
+    }
+
+    audit.log_batch(
+        batch_id=batch_id,
+        input_count=len(items),
+        success_count=success_count,
+        error_count=error_count,
+        output_guesses=output_guesses,
+        duration_ms=total_duration_ms,
+        average_item_ms=average_item_ms,
+        status=batch_status,
+        processing_ms=round(processing_ms, 3),
+        stage_totals_ms=rounded_stage_totals,
+    )
+
+    return jsonify({
+        "batch_id": batch_id,
+        "input_count": len(items),
+        "success_count": success_count,
+        "error_count": error_count,
+        "status": batch_status,
+        "duration_ms": round(total_duration_ms, 3),
+        "average_item_ms": round(average_item_ms, 3),
+        "stage_totals_ms": rounded_stage_totals,
+        "results": results,
+    }), 200
 
 @app.post("/appeal")
 def appeal():
