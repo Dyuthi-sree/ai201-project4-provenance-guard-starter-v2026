@@ -81,7 +81,59 @@ For 5 of 5 invalid submissions—including missing text, empty text, whitespace-
 **Why this target:** Invalid or excessive input should be stopped before the expensive detector model runs. A 5,000-character limit allows normal submissions while reducing accidental overload and attempts to abuse the service.
 
 ---
+# Unit 9 Acceptance Criteria — Batch Provenance Analysis
 
+## 1. A valid batch preserves submission order
+
+When a caller submits a batch of 5 valid items, the response contains exactly
+5 results with indexes 0 through 4 in the same order in all three trials.
+
+**Why this target:** A platform must be able to match every result to the
+original submission. Reordered results could attach an AI-authorship label to
+the wrong writer.
+
+---
+
+## 2. One invalid item does not destroy the entire batch
+
+When a batch contains 4 valid items and 1 invalid item, all three trials return
+4 successful results and 1 item-level error without returning a server error.
+
+**Why this target:** Batch processing should isolate malformed items. Rejecting
+four usable submissions because one item is invalid would make the endpoint
+unreliable for real uploads.
+
+---
+
+## 3. Oversized batches are rejected safely
+
+A request containing 11 items returns HTTP 400 in all three trials, records a
+rejected batch entry, and does not process any individual item.
+
+**Why this target:** The ten-item limit controls model inference time and
+prevents one request from holding the service for an excessive period.
+
+---
+
+## 4. Every completed batch is auditable
+
+For a valid 5-item batch, the audit log contains 5 individual decision entries
+with the same batch_id and 1 batch summary entry in all three trials.
+
+**Why this target:** A batch-level response alone is not enough to investigate
+a disputed label. Every result must remain traceable to its input and batch.
+
+---
+
+## 5. Warm batch processing averages below 100 milliseconds per item
+
+After one warm-up submission, a valid 5-item batch reports an average processing
+time below 100 milliseconds per item in all three trials on the documented
+machine.
+
+**Why this target:** The first model load is expensive, but subsequent requests
+should be fast enough for an interactive service. This criterion also makes the
+deployment environment part of the measured result.
 <!-- ─────────────────────────────────────────────────────────────────────────
      UNIT 8 — read this before you change anything above.
 
