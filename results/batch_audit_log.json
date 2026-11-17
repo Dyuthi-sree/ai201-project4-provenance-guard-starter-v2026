@@ -1,0 +1,99 @@
+{
+  "count": 5,
+  "entries": [
+    {
+      "batch_id": "e5da67b9-6c07-455f-bac2-c8b4a682f34c",
+      "batch_index": 1,
+      "combined_score": 0.3783,
+      "content_id": "9bf4467d-5f57-45cb-9d88-313c9030a7fd",
+      "creator_credential": null,
+      "creator_id": "demo_user",
+      "guess": "unsure",
+      "item_duration_ms": 13.85,
+      "label": "The authorship of this text is uncertain. Review is recommended.",
+      "model_score": 0.3374,
+      "source_score": 0.5,
+      "status": "decided",
+      "style_score": 0.6647,
+      "timestamp": "2026-11-17T19:13:16+00:00"
+    },
+    {
+      "average_item_ms": 3074.91,
+      "batch_id": "e5da67b9-6c07-455f-bac2-c8b4a682f34c",
+      "duration_ms": 6160.454,
+      "error_count": 0,
+      "event": "batch_submission",
+      "input_count": 2,
+      "output_guesses": [
+        "human",
+        "unsure"
+      ],
+      "processing_ms": 6149.821,
+      "stage_totals_ms": {
+        "combining": 0.006,
+        "model": 6148.606,
+        "source": 0.132,
+        "style": 0.217,
+        "validation": 0.012
+      },
+      "status": "completed",
+      "success_count": 2,
+      "timestamp": "2026-11-17T19:13:16+00:00"
+    },
+    {
+      "batch_id": "963ed389-79f4-4c2a-8122-41926883209e",
+      "batch_index": 0,
+      "combined_score": 0.1714,
+      "content_id": "ba749f5f-f41d-4233-ba62-d345533b74c9",
+      "creator_credential": "verified-human",
+      "creator_id": "dyuthi",
+      "guess": "human",
+      "item_duration_ms": 17.233,
+      "label": "This text shows strong signals of human writing.",
+      "model_score": 0.0954,
+      "source_score": 0.5,
+      "status": "decided",
+      "style_score": 0.6527,
+      "timestamp": "2026-11-17T19:14:01+00:00"
+    },
+    {
+      "batch_id": "963ed389-79f4-4c2a-8122-41926883209e",
+      "batch_index": 1,
+      "combined_score": 0.3783,
+      "content_id": "0906d5e3-5a27-45bf-a83e-931b9bbfea86",
+      "creator_credential": null,
+      "creator_id": "demo_user",
+      "guess": "unsure",
+      "item_duration_ms": 11.896,
+      "label": "The authorship of this text is uncertain. Review is recommended.",
+      "model_score": 0.3374,
+      "source_score": 0.5,
+      "status": "decided",
+      "style_score": 0.6647,
+      "timestamp": "2026-11-17T19:14:01+00:00"
+    },
+    {
+      "average_item_ms": 14.743,
+      "batch_id": "963ed389-79f4-4c2a-8122-41926883209e",
+      "duration_ms": 29.538,
+      "error_count": 0,
+      "event": "batch_submission",
+      "input_count": 2,
+      "output_guesses": [
+        "human",
+        "unsure"
+      ],
+      "processing_ms": 29.486,
+      "stage_totals_ms": {
+        "combining": 0.006,
+        "model": 28.573,
+        "source": 0.016,
+        "style": 0.047,
+        "validation": 0.013
+      },
+      "status": "completed",
+      "success_count": 2,
+      "timestamp": "2026-11-17T19:14:01+00:00"
+    }
+  ]
+}

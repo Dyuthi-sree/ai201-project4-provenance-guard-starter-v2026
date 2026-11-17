@@ -1,0 +1,58 @@
+{
+  "average_item_ms": 14.743,
+  "batch_id": "963ed389-79f4-4c2a-8122-41926883209e",
+  "duration_ms": 29.538,
+  "error_count": 0,
+  "input_count": 2,
+  "results": [
+    {
+      "confidence": 0.1714,
+      "content_id": "ba749f5f-f41d-4233-ba62-d345533b74c9",
+      "creator_credential": "verified-human",
+      "creator_id": "dyuthi",
+      "duration_ms": 17.233,
+      "guess": "human",
+      "index": 0,
+      "label": "This text shows strong signals of human writing.",
+      "model_score": 0.0954,
+      "source_score": 0.5,
+      "stage_duration_ms": {
+        "combining": 0.003,
+        "model": 16.833,
+        "source": 0.008,
+        "style": 0.024
+      },
+      "status": "success",
+      "style_score": 0.6527
+    },
+    {
+      "confidence": 0.3783,
+      "content_id": "0906d5e3-5a27-45bf-a83e-931b9bbfea86",
+      "creator_credential": null,
+      "creator_id": "demo_user",
+      "duration_ms": 11.896,
+      "guess": "unsure",
+      "index": 1,
+      "label": "The authorship of this text is uncertain. Review is recommended.",
+      "model_score": 0.3374,
+      "source_score": 0.5,
+      "stage_duration_ms": {
+        "combining": 0.003,
+        "model": 11.74,
+        "source": 0.008,
+        "style": 0.022
+      },
+      "status": "success",
+      "style_score": 0.6647
+    }
+  ],
+  "stage_totals_ms": {
+    "combining": 0.006,
+    "model": 28.573,
+    "source": 0.016,
+    "style": 0.047,
+    "validation": 0.013
+  },
+  "status": "completed",
+  "success_count": 2
+}
