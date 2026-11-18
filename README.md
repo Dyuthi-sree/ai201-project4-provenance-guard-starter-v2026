@@ -892,3 +892,874 @@ Six genuine human false-positive attacks are still labeled AI. The `0.85` model 
 
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
+
+<!-- UNIT9_CAPSTONE_START -->
+
+---
+
+# Unit 9 Capstone — Batch Provenance Analysis
+
+## What This Extends
+
+This capstone extends **Provenance Guard**, the backend authorship-analysis
+service built in Units 7 and 8. The original service evaluated one submission
+at a time. The extension adds `POST /batch-submit`, which accepts between one
+and ten submissions, preserves their order, isolates invalid items, returns
+per-item results, and records both individual decisions and a batch summary.
+
+A batch item follows the same three-signal pipeline as a normal submission:
+`detector.py::model_signal`, `stylometry.py::style_signal`, and
+`provenance.py::source_signal` feed `scoring.py::combine_signals`, which maps
+the combined score to a reader-facing label. Each result has its own
+`content_id`, signal scores, confidence, label, and timing.
+
+## The Shape
+
+I chose **Shape B: a local observable run with committed logs**. The service
+runs locally as a Flask backend, while `run_batch_eval.py` sends real HTTP
+requests and writes reproducible Markdown and JSON run records.
+
+**Out of scope:** A browser frontend, public cloud deployment, authentication,
+a persistent database, distributed workers, and a production job queue were
+ruled out of scope. The local PyTorch and GPT-2 runtime also exceeds the memory
+available on the free hosting option considered for this project.
+
+## Running It
+
+The documented local run path is in `RUNNING.md`. It requires Python 3.11 or
+newer, the packages in `requirements.txt`, and the approximately 550 MB GPT-2
+model downloaded by `python detector.py`. It does not require an API key.
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python detector.py
+python test.py
+python app.py
+```
+
+The service then answers at `http://127.0.0.1:5000`. In a second terminal, the
+complete three-trial evaluation runs with:
+
+```bash
+source .venv/bin/activate
+python run_batch_eval.py --label before
+python run_batch_eval.py --label after_cache
+```
+
+The committed observable run records are:
+
+- `results/batch_eval_2026-11-17_132311_before.json`
+- `results/batch_eval_2026-11-17_132311_before.md`
+- `results/batch_eval_2026-11-17_133109_after_cache.json`
+- `results/batch_eval_2026-11-17_133109_after_cache.md`
+
+## Instrumentation
+
+`app.py::batch_submit` measures total request duration, average time per item,
+and time spent in validation, model inference, stylometry, source analysis,
+and score combination. Successful items receive `batch_id`, `batch_index`,
+and `item_duration_ms` in `logs/audit.jsonl`. `audit.py::log_batch` records one
+summary with input count, success and error counts, output guesses, duration,
+stage totals, and status. Rejected batches are logged too.
+
+`GET /health` exposes model-cache hits, misses, maximum size, and current size.
+After the measured improvement it reported 54 hits, 6 misses, 6 cached texts,
+and a maximum size of 256. A later verification run reported 114 hits and 8
+misses, confirming continued cache reuse.
+
+### Ten structured log entries
+
+These entries were produced by `audit.py::log_batch` and retrieved through
+`app.py::get_log`. Each records a timestamp, what came in (`input_count`), what
+came out (`output_guesses`, success/error counts, or rejection), and duration.
+The final entry proves that the failure path was recorded.
+
+```json
+[
+  {
+    "average_item_ms": 0.07,
+    "batch_id": "1aea48f2-7472-488a-bf9c-3f87d1a0a347",
+    "duration_ms": 0.371,
+    "error_count": 1,
+    "event": "batch_submission",
+    "input_count": 5,
+    "output_guesses": [
+      "human",
+      "human",
+      "ai",
+      "human"
+    ],
+    "processing_ms": 0.35,
+    "stage_totals_ms": {
+      "combining": 0.003,
+      "model": 0.001,
+      "source": 0.017,
+      "style": 0.04,
+      "validation": 0.015
+    },
+    "status": "partial",
+    "success_count": 4,
+    "timestamp": "2026-11-18T05:29:33+00:00"
+  },
+  {
+    "average_item_ms": 0.086,
+    "batch_id": "d112f8bb-ad9c-41c4-a7fb-2e449581bb8d",
+    "duration_ms": 0.453,
+    "error_count": 1,
+    "event": "batch_submission",
+    "input_count": 5,
+    "output_guesses": [
+      "human",
+      "human",
+      "ai",
+      "human"
+    ],
+    "processing_ms": 0.429,
+    "stage_totals_ms": {
+      "combining": 0.003,
+      "model": 0.001,
+      "source": 0.017,
+      "style": 0.041,
+      "validation": 0.015
+    },
+    "status": "partial",
+    "success_count": 4,
+    "timestamp": "2026-11-18T05:29:33+00:00"
+  },
+  {
+    "average_item_ms": 0.074,
+    "batch_id": "cd480b99-ae5d-45c2-85d9-d34e711d6883",
+    "duration_ms": 0.397,
+    "error_count": 1,
+    "event": "batch_submission",
+    "input_count": 5,
+    "output_guesses": [
+      "human",
+      "human",
+      "ai",
+      "human"
+    ],
+    "processing_ms": 0.369,
+    "stage_totals_ms": {
+      "combining": 0.003,
+      "model": 0.001,
+      "source": 0.017,
+      "style": 0.038,
+      "validation": 0.014
+    },
+    "status": "partial",
+    "success_count": 4,
+    "timestamp": "2026-11-18T05:29:33+00:00"
+  },
+  {
+    "average_item_ms": 0.103,
+    "batch_id": "2679108b-28ba-45d9-bec0-7a6e2a2608e1",
+    "duration_ms": 0.551,
+    "error_count": 0,
+    "event": "batch_submission",
+    "input_count": 5,
+    "output_guesses": [
+      "human",
+      "human",
+      "ai",
+      "human",
+      "human"
+    ],
+    "processing_ms": 0.514,
+    "stage_totals_ms": {
+      "combining": 0.004,
+      "model": 0.002,
+      "source": 0.023,
+      "style": 0.055,
+      "validation": 0.019
+    },
+    "status": "completed",
+    "success_count": 5,
+    "timestamp": "2026-11-18T05:29:33+00:00"
+  },
+  {
+    "average_item_ms": 0.11,
+    "batch_id": "eef55489-1d82-4f1b-ac42-0dab74413175",
+    "duration_ms": 0.584,
+    "error_count": 0,
+    "event": "batch_submission",
+    "input_count": 5,
+    "output_guesses": [
+      "human",
+      "human",
+      "ai",
+      "human",
+      "human"
+    ],
+    "processing_ms": 0.55,
+    "stage_totals_ms": {
+      "combining": 0.004,
+      "model": 0.002,
+      "source": 0.023,
+      "style": 0.065,
+      "validation": 0.02
+    },
+    "status": "completed",
+    "success_count": 5,
+    "timestamp": "2026-11-18T05:29:33+00:00"
+  },
+  {
+    "average_item_ms": 0.089,
+    "batch_id": "9b4db52c-77fc-4ad6-91c6-d5d760e476aa",
+    "duration_ms": 0.475,
+    "error_count": 0,
+    "event": "batch_submission",
+    "input_count": 5,
+    "output_guesses": [
+      "human",
+      "human",
+      "ai",
+      "human",
+      "human"
+    ],
+    "processing_ms": 0.447,
+    "stage_totals_ms": {
+      "combining": 0.004,
+      "model": 0.002,
+      "source": 0.022,
+      "style": 0.049,
+      "validation": 0.017
+    },
+    "status": "completed",
+    "success_count": 5,
+    "timestamp": "2026-11-18T05:29:33+00:00"
+  },
+  {
+    "average_item_ms": 0.082,
+    "batch_id": "c05b4cea-0a50-411c-8e72-9220a7765d01",
+    "duration_ms": 0.43,
+    "error_count": 0,
+    "event": "batch_submission",
+    "input_count": 5,
+    "output_guesses": [
+      "human",
+      "human",
+      "ai",
+      "human",
+      "human"
+    ],
+    "processing_ms": 0.411,
+    "stage_totals_ms": {
+      "combining": 0.003,
+      "model": 0.001,
+      "source": 0.021,
+      "style": 0.048,
+      "validation": 0.016
+    },
+    "status": "completed",
+    "success_count": 5,
+    "timestamp": "2026-11-18T05:29:33+00:00"
+  },
+  {
+    "average_item_ms": 0.088,
+    "batch_id": "8e27e206-68f0-4d73-9b5e-436706246408",
+    "duration_ms": 0.467,
+    "error_count": 0,
+    "event": "batch_submission",
+    "input_count": 5,
+    "output_guesses": [
+      "human",
+      "human",
+      "ai",
+      "human",
+      "human"
+    ],
+    "processing_ms": 0.44,
+    "stage_totals_ms": {
+      "combining": 0.003,
+      "model": 0.002,
+      "source": 0.021,
+      "style": 0.048,
+      "validation": 0.017
+    },
+    "status": "completed",
+    "success_count": 5,
+    "timestamp": "2026-11-18T05:29:33+00:00"
+  },
+  {
+    "average_item_ms": 0.093,
+    "batch_id": "199ba77d-1b73-4528-a2e8-b47789a3e7f0",
+    "duration_ms": 0.485,
+    "error_count": 0,
+    "event": "batch_submission",
+    "input_count": 5,
+    "output_guesses": [
+      "human",
+      "human",
+      "ai",
+      "human",
+      "human"
+    ],
+    "processing_ms": 0.465,
+    "stage_totals_ms": {
+      "combining": 0.003,
+      "model": 0.001,
+      "source": 0.023,
+      "style": 0.05,
+      "validation": 0.019
+    },
+    "status": "completed",
+    "success_count": 5,
+    "timestamp": "2026-11-18T05:29:33+00:00"
+  },
+  {
+    "average_item_ms": 0.0,
+    "batch_id": "601660ee-44ff-445f-92f7-f47a21eb97d2",
+    "duration_ms": 0.034,
+    "error_count": 11,
+    "event": "batch_submission",
+    "input_count": 11,
+    "output_guesses": [],
+    "rejection_reason": "batch_too_large",
+    "status": "rejected",
+    "success_count": 0,
+    "timestamp": "2026-11-18T05:29:33+00:00"
+  }
+]
+```
+
+## Run Log — Before
+
+The baseline was produced by `run_batch_eval.py::main` before model-score
+caching and saved in `results/batch_eval_2026-11-17_132311_before.json`.
+
+| Criterion | Target | Trial 1 | Trial 2 | Trial 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Valid batch preserves submission order | Exactly 5 results indexed 0 through 4 | 5/5, [0, 1, 2, 3, 4] — PASS | 5/5, [0, 1, 2, 3, 4] — PASS | 5/5, [0, 1, 2, 3, 4] — PASS | MET |
+| 2. One invalid item does not destroy the batch | 4 successes and 1 item-level error | 4 success, 1 error — PASS | 4 success, 1 error — PASS | 4 success, 1 error — PASS | MET |
+| 3. Oversized batches are rejected safely | HTTP 400, one rejection log, and 0 processed items | HTTP 400; 0 processed — PASS | HTTP 400; 0 processed — PASS | HTTP 400; 0 processed — PASS | MET |
+| 4. Every completed batch is auditable | 5 decision entries and 1 batch summary | 5 decisions + 1 summary — PASS | 5 decisions + 1 summary — PASS | 5 decisions + 1 summary — PASS | MET |
+| 5. Warm batch latency remains usable | Average below 100 ms per item | 14.020 ms/item — PASS | 14.003 ms/item — PASS | 14.018 ms/item — PASS | MET |
+
+## Real Output — Before
+
+### Criterion 1 — Valid batch preserves submission order
+
+Produced by `run_batch_eval.py::order_trial` against `app.py::batch_submit`.
+
+```json
+[
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "5152cfa3-10b3-45b5-a660-f1ba372d9d0b",
+    "result_count": 5,
+    "indexes": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "8d6e9f58-3641-48b9-b739-5a3455cb290c",
+    "result_count": 5,
+    "indexes": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "126871bd-0491-4ff7-bc1b-c3d9807722e7",
+    "result_count": 5,
+    "indexes": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ]
+  }
+]
+```
+
+### Criterion 2 — One invalid item does not destroy the batch
+
+Produced by `run_batch_eval.py::isolation_trial` against `app.py::batch_submit`.
+
+```json
+[
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "ef669d09-3731-4ef8-a818-f64d839d6c1d",
+    "success_count": 4,
+    "error_count": 1,
+    "error_indexes": [
+      2
+    ]
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "cdc7b1b4-72cb-4423-95d2-1cbcff5927d5",
+    "success_count": 4,
+    "error_count": 1,
+    "error_indexes": [
+      2
+    ]
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "4f33f2c2-f7df-4743-984f-5a628e5963f8",
+    "success_count": 4,
+    "error_count": 1,
+    "error_indexes": [
+      2
+    ]
+  }
+]
+```
+
+### Criterion 3 — Oversized batches are rejected safely
+
+Produced by `run_batch_eval.py::oversized_trial` against `app.py::batch_submit`.
+
+```json
+[
+  {
+    "passed": true,
+    "http_status": 400,
+    "batch_id": "7c1e3b74-6c4e-40f6-bb04-ca6536aed3c6",
+    "rejected_batch_entries": 1,
+    "individual_entries": 0
+  },
+  {
+    "passed": true,
+    "http_status": 400,
+    "batch_id": "af37ca0f-e03e-44c7-927c-44b7406b7973",
+    "rejected_batch_entries": 1,
+    "individual_entries": 0
+  },
+  {
+    "passed": true,
+    "http_status": 400,
+    "batch_id": "6989012b-2985-4258-900d-054555462dfb",
+    "rejected_batch_entries": 1,
+    "individual_entries": 0
+  }
+]
+```
+
+### Criterion 4 — Every completed batch is auditable
+
+Produced by `run_batch_eval.py::audit_trial` against `app.py::batch_submit`.
+
+```json
+[
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "f5a72975-956d-4dbe-b926-5288d5ec6921",
+    "individual_decisions": 5,
+    "batch_summaries": 1
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "36e78b9d-aae3-4430-a6d2-4ee1cfac2976",
+    "individual_decisions": 5,
+    "batch_summaries": 1
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "17d5c760-40d8-4687-8a82-d1afa2ae2f1b",
+    "individual_decisions": 5,
+    "batch_summaries": 1
+  }
+]
+```
+
+### Criterion 5 — Warm batch latency remains usable
+
+Produced by `run_batch_eval.py::latency_trial` against `app.py::batch_submit`.
+
+```json
+[
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "77b1b36f-8a79-4bd7-800c-1cc9b1589791",
+    "average_item_ms": 14.02,
+    "duration_ms": 70.135,
+    "stage_totals_ms": {
+      "combining": 0.011,
+      "model": 68.662,
+      "source": 0.038,
+      "style": 0.11,
+      "validation": 0.027
+    }
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "8db50403-885c-4fde-8de1-aaba52a7d714",
+    "average_item_ms": 14.003,
+    "duration_ms": 70.048,
+    "stage_totals_ms": {
+      "combining": 0.011,
+      "model": 68.707,
+      "source": 0.037,
+      "style": 0.103,
+      "validation": 0.026
+    }
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "dfd2b772-ff2a-4491-af83-297495ef3caa",
+    "average_item_ms": 14.018,
+    "duration_ms": 70.136,
+    "stage_totals_ms": {
+      "combining": 0.011,
+      "model": 68.73,
+      "source": 0.038,
+      "style": 0.105,
+      "validation": 0.026
+    }
+  }
+]
+```
+
+
+## Verdicts and Diagnosis
+
+All five criteria were **MET** in all three baseline trials, so there were no
+misses requiring repair. However, criterion 5's target of less than 100 ms per
+warm item was too loose: the actual baseline mean was **14.014
+ms/item**. A defensible tighter future target is **below 20 ms per warm item in
+all three trials**. I did not edit or lower the original criterion after seeing
+the results.
+
+The timing breakdown identified a performance opportunity. Model inference
+dominated warm processing, and identical submissions were recomputed even
+though `model_signal` is deterministic for the same text and loaded model. A
+separate cold-start observation took approximately 3.144 seconds for the first
+item because it also loaded GPT-2; the next uncached warm item took about 11.4
+ms. Cold start and repeated warm inference are therefore different costs.
+
+## The Improvement
+
+I added a bounded `functools.lru_cache(maxsize=256)` to
+`detector.py::model_signal`. Repeated identical text now reuses the previously
+computed model score rather than running GPT-2 inference again. I also added
+cache statistics to `app.py::health` so the optimization is observable.
+
+The change follows directly from the timing diagnosis: repeated model scoring
+was the dominant avoidable stage. I reran the full five-criterion set three
+times in the same format after making the change.
+
+## Run Log — After
+
+| Criterion | Target | Trial 1 | Trial 2 | Trial 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Valid batch preserves submission order | Exactly 5 results indexed 0 through 4 | 5/5, [0, 1, 2, 3, 4] — PASS | 5/5, [0, 1, 2, 3, 4] — PASS | 5/5, [0, 1, 2, 3, 4] — PASS | MET |
+| 2. One invalid item does not destroy the batch | 4 successes and 1 item-level error | 4 success, 1 error — PASS | 4 success, 1 error — PASS | 4 success, 1 error — PASS | MET |
+| 3. Oversized batches are rejected safely | HTTP 400, one rejection log, and 0 processed items | HTTP 400; 0 processed — PASS | HTTP 400; 0 processed — PASS | HTTP 400; 0 processed — PASS | MET |
+| 4. Every completed batch is auditable | 5 decision entries and 1 batch summary | 5 decisions + 1 summary — PASS | 5 decisions + 1 summary — PASS | 5 decisions + 1 summary — PASS | MET |
+| 5. Warm batch latency remains usable | Average below 100 ms per item | 0.145 ms/item — PASS | 0.127 ms/item — PASS | 0.140 ms/item — PASS | MET |
+
+## Real Output — After
+
+### Criterion 1 — Valid batch preserves submission order
+
+Produced by `run_batch_eval.py::order_trial` against `app.py::batch_submit`.
+
+```json
+[
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "113e5c83-faeb-4762-bce5-1206fb58b413",
+    "result_count": 5,
+    "indexes": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "9b32aebe-6495-4603-b2bb-8a9e2e64a27f",
+    "result_count": 5,
+    "indexes": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "39386de4-010f-443c-800f-4cc2c2f18bd6",
+    "result_count": 5,
+    "indexes": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ]
+  }
+]
+```
+
+### Criterion 2 — One invalid item does not destroy the batch
+
+Produced by `run_batch_eval.py::isolation_trial` against `app.py::batch_submit`.
+
+```json
+[
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "e643c24a-503e-416c-a0d1-4939d4829c9a",
+    "success_count": 4,
+    "error_count": 1,
+    "error_indexes": [
+      2
+    ]
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "786aa2df-8613-4af8-b86b-66662fb84b99",
+    "success_count": 4,
+    "error_count": 1,
+    "error_indexes": [
+      2
+    ]
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "83ef7511-b493-4fb2-98b1-4eb3bf47f326",
+    "success_count": 4,
+    "error_count": 1,
+    "error_indexes": [
+      2
+    ]
+  }
+]
+```
+
+### Criterion 3 — Oversized batches are rejected safely
+
+Produced by `run_batch_eval.py::oversized_trial` against `app.py::batch_submit`.
+
+```json
+[
+  {
+    "passed": true,
+    "http_status": 400,
+    "batch_id": "7f38e9eb-31e0-41dc-b4ab-fdde83bf90da",
+    "rejected_batch_entries": 1,
+    "individual_entries": 0
+  },
+  {
+    "passed": true,
+    "http_status": 400,
+    "batch_id": "151e60d8-b72e-4ecd-9447-6d22e13466a9",
+    "rejected_batch_entries": 1,
+    "individual_entries": 0
+  },
+  {
+    "passed": true,
+    "http_status": 400,
+    "batch_id": "1fffba8f-4775-41f2-b1f2-6b582dffede3",
+    "rejected_batch_entries": 1,
+    "individual_entries": 0
+  }
+]
+```
+
+### Criterion 4 — Every completed batch is auditable
+
+Produced by `run_batch_eval.py::audit_trial` against `app.py::batch_submit`.
+
+```json
+[
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "5f86e927-4f5c-4884-9051-b4a8829b5a4e",
+    "individual_decisions": 5,
+    "batch_summaries": 1
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "de5d567e-d2f1-4df0-957f-4a69f0caefe7",
+    "individual_decisions": 5,
+    "batch_summaries": 1
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "1ccbe997-2647-460c-8089-6a312db6b5c1",
+    "individual_decisions": 5,
+    "batch_summaries": 1
+  }
+]
+```
+
+### Criterion 5 — Warm batch latency remains usable
+
+Produced by `run_batch_eval.py::latency_trial` against `app.py::batch_submit`.
+
+```json
+[
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "b1af1b11-4255-4cef-ba86-caa442658c46",
+    "average_item_ms": 0.145,
+    "duration_ms": 0.766,
+    "stage_totals_ms": {
+      "combining": 0.004,
+      "model": 0.001,
+      "source": 0.022,
+      "style": 0.053,
+      "validation": 0.019
+    }
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "815b645d-c437-4d4b-8f5b-4b0ef6d7bcaf",
+    "average_item_ms": 0.127,
+    "duration_ms": 0.664,
+    "stage_totals_ms": {
+      "combining": 0.004,
+      "model": 0.001,
+      "source": 0.022,
+      "style": 0.053,
+      "validation": 0.019
+    }
+  },
+  {
+    "passed": true,
+    "http_status": 200,
+    "batch_id": "036e46a4-7977-4965-9ae7-6f214853cf83",
+    "average_item_ms": 0.14,
+    "duration_ms": 0.725,
+    "stage_totals_ms": {
+      "combining": 0.003,
+      "model": 0.001,
+      "source": 0.022,
+      "style": 0.049,
+      "validation": 0.019
+    }
+  }
+]
+```
+
+
+### Did it help, and what did it cost elsewhere?
+
+Yes. Mean repeated-input latency decreased from **14.014 ms/item** to
+**0.137 ms/item**, a **99.0% reduction** and approximately
+**102x speedup**. All five acceptance criteria remained MET in every
+post-change trial, so the optimization did not break ordering, partial-error
+handling, rejection, auditability, or the latency target.
+
+The improvement applies only to identical text already present in the cache.
+Unique submissions still require model inference. The cache also retains up to
+256 submitted strings and scores in process memory, which creates privacy and
+memory costs. It is local to one process, is not shared by multiple workers,
+and disappears when the service restarts.
+
+## What It Costs
+
+The service uses a local model, so there is no per-request API charge. The main
+measured cost is latency plus local memory. `run_batch_eval.py::latency_trial`
+measured three trials after warming the model, and `app.py::batch_submit`
+reported the per-item and batch durations.
+
+For a five-item batch before caching:
+
+```text
+14.014 ms/item × 5 items = 70.068 ms/batch
+70.068 ms/batch × 100 batches/day = 7006.8 ms/day
+= 7.007 seconds/day
+```
+
+For a five-item batch when all five texts are already cached:
+
+```text
+0.137 ms/item × 5 items = 0.687 ms/batch
+0.687 ms/batch × 100 batches/day = 68.7 ms/day
+= 0.069 seconds/day
+```
+
+This is a best-case repeated-input comparison, not a promise for unique text.
+The cold first request also pays several seconds to load GPT-2. Disk cost
+includes the approximately 550 MB model, while runtime memory includes
+PyTorch, the loaded model, Flask, and up to 256 cached text-score entries.
+
+## What's Still Broken
+
+No acceptance criterion remains missed, but several production limitations
+remain:
+
+- The first request after restart can take several seconds while GPT-2 loads.
+- The speedup applies only to repeated identical text; unique text is uncached.
+- Raw submitted text can remain temporarily in memory as an LRU-cache key.
+- The JSONL audit log and verified-creator file are local rather than a
+  transactional database.
+- Multiple server workers would have separate caches and separate in-memory
+  rate-limit state.
+- Batch items are processed sequentially, not through a durable background
+  queue.
+
+Given more time, I would first replace the raw-text cache key with a bounded,
+expiring content-hash cache. I would prioritize that over parallel processing
+because retaining a writer's raw submission in memory creates a more important
+privacy risk than the remaining warm latency creates a usability problem.
+
+## How I Used AI — Unit 9
+
+### Moment 1
+
+- **What I asked for:** I asked for help turning the batch-processing idea into
+  five measurable acceptance criteria and a three-trial evaluator.
+- **What came back:** AI proposed tests for order preservation, partial-error
+  isolation, oversized-batch rejection, audit completeness, and warm latency.
+- **What I changed:** I kept targets tied to the actual ten-item route limit and
+  the cost of assigning a result to the wrong writer, committed the criteria
+  before the run output, and verified every target with real HTTP responses.
+
+### Moment 2
+
+- **What I asked for:** I asked for help interpreting the timing evidence and
+  selecting a measurable improvement.
+- **What came back:** AI identified repeated model inference as an avoidable
+  stage and suggested a bounded score cache with observable statistics.
+- **What I changed:** I limited the cache to 256 entries, exposed hits and
+  misses through `/health`, reran all five criteria three times, and explicitly
+  documented that the speedup applies only to repeated input and costs memory
+  and privacy.
+
+<!-- UNIT9_CAPSTONE_END -->

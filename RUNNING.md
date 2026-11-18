@@ -253,6 +253,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python detector.py
 python test.py
+```
 
 ---
 
