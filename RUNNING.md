@@ -83,29 +83,26 @@ position.**
 
 ## The routes
 
-| Route | State | What it does |
+## The routes
+
+| Route | Method | What it does |
 |---|---|---|
-| `POST /ping` | **works** | The example. Don't edit it |
-| `GET /health` | **works** | Is the service up, is the model loaded |
-| `GET /log` | **works** | The audit log, as JSON |
-| `POST /submit` | **you build it** | Milestones 3, 4, 5 |
-| `POST /appeal` | **you build it** | Milestone 5 |
+| `/ping` | POST | Confirms that the Flask service is responding |
+| `/health` | GET | Reports model state, rate limiting, audit count, and cache statistics |
+| `/log` | GET | Returns structured audit-log entries |
+| `/submit` | POST | Scores one writing submission using the model, style, and source signals |
+| `/batch-submit` | POST | Scores 1–10 submissions in order, isolates item errors, and records batch timing |
+| `/appeal` | POST | Moves an existing decision to `under_review` and records the appeal |
+| `/content/<id>` | GET | Returns one submission’s current status and history |
+| `/verify-human` | POST | Awards a verified-human credential after an authorship attestation |
 
 ---
 
 ## Every command
 
-| Command | What it does |
-|---|---|
-| `python test.py` | Checks your environment |
-| `python app.py` | Runs the service |
-| `python detector.py` | Downloads the model and scores a sample — **run before class** |
-| `python detector.py "some text"` | Score one piece of text from the terminal |
-| `python stylometry.py "some text"` | Your style measures, on one piece of text |
-| `python run_attacks.py --set <folder>` | The attack set — **unit 8** |
-| `python run_attacks.py --flood 15` | Push past your rate limit and print the status codes — **unit 8** |
-| `python run_eval.py --label before` | Your five criteria, three trials — **unit 8** |
-
+| `python run_batch_eval.py --label before` | Runs all five Unit 9 batch criteria three times |
+| `python run_batch_eval.py --label after_cache` | Re-runs the same criteria after model-score caching |
+| `curl http://127.0.0.1:5000/health` | Shows model state and cache hits, misses, and size |
 ---
 
 ## Which piece goes with which milestone
@@ -231,6 +228,31 @@ answer for this project, not a fallback and not a failure. Working out that a
 system doesn't fit its host *before* you spend an evening watching it get
 killed is the skill unit 9 is actually testing. Write the arithmetic above in
 your write-up; that's the deliverable.
+
+---
+## Unit 9 — Batch Provenance Analysis
+
+Unit 9 extends Provenance Guard with `POST /batch-submit`. The endpoint accepts
+between one and ten submissions, evaluates them in their original order, and
+returns one result for every input. A malformed item produces an item-level
+error without destroying the valid results in the same batch.
+
+### Requirements
+
+- Python 3.11 or newer
+- Dependencies from `requirements.txt`
+- The local GPT-2 detector model, approximately 550 MB
+- No API key
+- Enough memory to load PyTorch and GPT-2 locally
+
+Create and prepare the environment:
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python detector.py
+python test.py
 
 ---
 
